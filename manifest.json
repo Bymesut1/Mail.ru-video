@@ -1,0 +1,21 @@
+{
+  "name": "mailru",
+  "version": "1.0.0",
+  "scrapers": [
+    {
+      "id": "mailru",
+      "name": "mailru",
+      "description": "my.mail.ru kullanıcı yüklemeleri (TR dublaj/dual filmler)",
+      "version": "1.0.0",
+      "author": "custom",
+      "supportedTypes": ["movie"],
+      "filename": "providers/mailru.js",
+      "enabled": true,
+      "hasSettings": false,
+      "formats": ["mp4"],
+      "contentLanguage": ["tr"],
+      "limited": false,
+      "disabledPlatforms": []
+    }
+  ]
+}
