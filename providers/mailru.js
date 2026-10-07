@@ -192,25 +192,23 @@ function partialName(info, wants) {
   return false;
 }
 
-// Dil etiketi ve öncelik katmanı (0 = en önde): TR / TR Dublaj / Türkçe Dublaj / TR Dual
+// Dil etiketi. Sadece TÜRKÇE SES kabul edilir:
+//   TR / TR Dublaj / Türkçe Dublaj / TR Dual  -> ok (tier 0)
+//   TR Altyazı (ses orijinal), sadece Dual, EN, RU, AR, ... -> ok değil
 function langInfo(info) {
   var keys = Object.keys(info.tags).concat(info.bag);
   function any(re) { return keys.some(function (k) { return re.test(k); }); }
-  var tr = any(/^tr$|^trk$|turkce|turkish|dublaj|^trdub|^dub$/);
+  var tr = any(/^tr$|^trk$|turkce|turkish|dublaj|^trdub/);
   var dual = any(/dual/);
-  var dublaj = any(/dublaj|^dub$|^trdub/);
+  var dublaj = any(/dublaj|^trdub/);
   var sub = any(/altyaz|^sub$|^subs$|subtitle/);
+  var foreign = any(/^(rus|russian|rusca|ru|ukr|ukrainian|ger|german|deu|fre|french|fra|spa|spanish|ita|italian|hin|hindi|kor|korean|jpn|japanese|chi|chinese|pol|por|arabic|ar|arapca|farsi|persian)$/);
   var en = any(/^en$|^eng$|^english$|ingilizce/);
-  var ar = any(/^ar$|arabic|arapca/);
-  if (tr && dual) return { label: 'TR Dual', tier: 0 };
-  if (tr && dublaj) return { label: 'TR Dublaj', tier: 0 };
-  if (tr && sub) return { label: 'TR Altyazı', tier: 1 };
-  if (tr) return { label: 'TR', tier: 0 };
-  if (dual) return { label: 'Dual', tier: 1 };
-  if (sub) return { label: 'Altyazı', tier: 1 };
-  if (ar) return { label: 'AR', tier: 4 };
-  if (en) return { label: 'EN', tier: 3 };
-  return { label: '?', tier: 2 };
+  if (tr && dublaj) return { label: 'TR Dublaj', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
+  if (tr && dual) return { label: 'TR Dual', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
+  if (tr && sub) return { label: 'TR Altyazı', tier: 5, ok: false, foreign: foreign, sub: true, en: en };
+  if (tr) return { label: 'TR', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
+  return { label: dual ? 'Dual' : sub ? 'Altyazı' : foreign ? 'Yabancı' : en ? 'EN' : '?', tier: 5, ok: false, foreign: foreign, sub: sub, en: en };
 }
 
 // Puanlama: null = ele, yoksa { score, info }
@@ -255,6 +253,13 @@ function rankItem(item, ctx) {
 
   if (partial && (!item.dur || !info.years.length)) return null;       // kısmi eşleşme: yıl ve süre ŞART
   var li = langInfo(info);
+  if (/[\u0400-\u04FF]/.test(item.title) && !li.ok) return null;       // Rusça (Kiril) başlık
+  if (!li.ok) {
+    // Etiket yok: sadece TÜRKÇE adla yüklenmişse (Geleceğe Dönüş...) ve başka dil/altyazı etiketi yoksa Türkçe say
+    var trNameOk = ctx.trWants && ctx.trWants.length && nameMatch(info, ctx.trWants);
+    if (trNameOk && !li.foreign && !li.sub && !li.en && li.label === '?') li = { label: 'TR Ad', tier: 1, ok: true };
+    else return null;                                                    // EN / RU / AR / altyazılı / Dual(TR yok) / etiketsiz
+  }
   if (info.res >= 2160) score += 4; else if (info.res >= 1080) score += 3; else if (info.res >= 720) score += 2;
 
   if (score < 40) return null;
@@ -442,20 +447,23 @@ function getStreams(tmdbId, mediaType, season, episode) {
     var year = parseInt((info.release_date || '').slice(0, 4), 10) || 0;
     if (!info.title && !info.original_title) return debugStream('TMDB bilgisi eksik');
 
-    var alts = [];
+    var alts = [], trAlts = [];
     try {
       ((info.alternative_titles && info.alternative_titles.titles) || []).forEach(function (a) {
         if (a && a.title && /^(TR|US|GB)$/.test(a.iso_3166_1 || '')) alts.push(a.title);
+        if (a && a.title && a.iso_3166_1 === 'TR') trAlts.push(a.title);
       });
     } catch (e) {}
     try {
       ((info.translations && info.translations.translations) || []).forEach(function (t) {
-        if (t && t.iso_639_1 === 'tr' && t.data && t.data.title) alts.push(t.data.title);
+        if (t && t.iso_639_1 === 'tr' && t.data && t.data.title) { alts.push(t.data.title); trAlts.push(t.data.title); }
       });
     } catch (e) {}
     var titles = uniq([info.original_title, en.title, info.title]);
     var wants = uniq(titles.concat(alts.slice(0, 8)));
-    var ctx = { imdb: info.imdb_id || '', year: year, runtime: info.runtime || en.runtime || 0, wants: wants };
+    var nonTr = [norm(info.original_title), norm(en.title)];
+    var trWants = uniq([info.title].concat(trAlts)).filter(function (t) { return t && nonTr.indexOf(norm(t)) === -1; });
+    var ctx = { imdb: info.imdb_id || '', year: year, runtime: info.runtime || en.runtime || 0, wants: wants, trWants: trWants };
     dbg.push('film ' + (info.original_title || info.title) + ' ' + year + ' ' + (ctx.imdb || '-') + ' ' + ctx.runtime + 'dk');
 
     var queries = buildQueries(ctx.imdb, year, titles);
