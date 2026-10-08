@@ -995,7 +995,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.0'];
+  dbg = ['v1.5.1'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
