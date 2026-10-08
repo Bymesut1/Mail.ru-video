@@ -14,6 +14,15 @@ var AYAR = {
   MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
   ONEKLER: ['tt.57556'], // yükleyenin dosya adının başına koyduğu işaretler ("işaret + film adı" olarak da aranır)
+  // GARANTİ LİSTESİ: sitede olduğunu bildiğin ama bulunamayan filmler. adlar: TMDB'deki herhangi bir ad, yil: TMDB yılı,
+  // dosya: sitedeki TAM başlık. Bu filmde önce bu başlık aranır ve bulunursa (yıl/süre/dil bakılmadan) listeye girer.
+  MANUEL: [
+    { adlar: ['The Tuxedo', 'Smokin'], yil: 2002, dosya: 'tt.57556.Smokin.tr' },
+    { adlar: ["A Kid in Aladdin's Palace", "Alaaddin'in Sarayı"], yil: 1997, dosya: "Alaaddin'in Sarayı 1997 tr" }
+  ],
+  // Yükleyen hesabın video listesi (ör. 'https://m.my.mail.ru/mail/KULLANICI/video/'). Doluysa her aramada bu sayfalar da taranır.
+  HESAPLAR: [],
+  HESAP_SAYFA: 6,
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 5, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   ARAMA_SURESI: 4500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
@@ -653,6 +662,9 @@ function langInfo(info) {
 
 // Puanlama: null = ele, yoksa { score, info }
 function rankItem(item, ctx) {
+  if (ctx.manuel && ctx.manuel.indexOf(norm(item.title)) > -1) {          // garanti listesindeki dosya
+    return { score: 999, info: analyze(item.title), lang: 'TR', tier: 0, maybe: false };
+  }
   var info = analyze(item.title);
   var imdbOk = !!(info.imdb && info.imdb === ctx.imdb);
   var nameOk = nameMatch(info, ctx.wants);
@@ -965,6 +977,10 @@ function buildQueries(imdb, year, titles, trTitles) {
   add(h0 && h0 !== t0 && h0 + ' TR');
   ETIKET_ILK.forEach(function (tag) { names.forEach(function (n) { add(n + ' ' + tag); }); });
   // Yükleyenlerin yazım biçimleri: bitişik (YapayZeka), ünlüsüz (AltncHs / Bnka Sygnu), yükleyen işareti (tt.57556 ...)
+  var noApos = main.replace(/['’`]/g, ' ').replace(/\s+/g, ' ').trim();                    // "Alaaddin'in Sarayı" -> "Alaaddin in Sarayı"
+  var noSuffix = main.replace(/['’`][a-zçğıöşü]{1,4}(?=\s|$)/gi, '').replace(/\s+/g, ' ').trim();   // -> "Alaaddin Sarayı"
+  if (noApos !== main) { add(noApos + y); add(noApos); }
+  if (noSuffix !== main && noSuffix !== noApos) { add(noSuffix + y); add(noSuffix); }
   var gl = glueTitle(main), gl0 = glueTitle(t0);
   add(gl);
   add(gl && gl + y);
@@ -995,7 +1011,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.1'];
+  dbg = ['v1.5.2'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -1028,11 +1044,32 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
     dbg.push('film ' + (info.original_title || info.title) + ' ' + year + ' ' + (ctx.imdb || '-') + ' ' + ctx.runtime + 'dk');
 
     var queries = buildQueries(ctx.imdb, year, titles, trWants);
+    ctx.manuel = [];
+    var manuelQs = [];
+    (AYAR.MANUEL || []).forEach(function (e) {
+      if (!e || !e.dosya || (e.yil && year && e.yil !== year)) return;
+      var hit = (e.adlar || []).some(function (a) { return wants.some(function (w) { return norm(w) === norm(a); }); });
+      if (!hit) return;
+      ctx.manuel.push(norm(e.dosya));
+      manuelQs.push(e.dosya);
+      manuelQs.push(e.dosya.replace(/['’`]/g, ' '));
+      manuelQs.push(e.dosya.replace(/^tt+\.?\d+\.?/i, ''));
+    });
+    if (manuelQs.length) { queries = uniq(manuelQs.concat(queries)); dbg.push('garanti ' + ctx.manuel.length); }
     var sinks = queries.map(function () { return []; });
     var mainQ = (trWants[0] || titles[0] || '').replace(/\s+/g, ' ').trim();
     var jobs = queries.map(function (q, i) {
       var pages = (q === mainQ || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
       return searchOnce(q, i + 1, pages, sinks[i]);
+    });
+    (AYAR.HESAPLAR || []).forEach(function (u, hi) {                       // yükleyen hesabın tüm listesi
+      var hs = [];
+      sinks.push(hs);
+      jobs.push(getRaw(u, null, 'H' + hi).then(function (r) {
+        var items = r.ok ? parseSearch(r.text) : [];
+        hs.push.apply(hs, items);
+        return items.length ? morePages(r.text, items, AYAR.HESAP_SAYFA, 'H' + hi, hs) : items;
+      }));
     });
     return waitSome(jobs, Math.min(jobs.length, 14), AYAR.ARAMA_SURESI).then(function () {
       var seen = {}, all = [];
