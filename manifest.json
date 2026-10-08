@@ -1,12 +1,12 @@
 {
   "name": "mailru",
-  "version": "1.6.0",
+  "version": "1.5.6",
   "scrapers": [
     {
       "id": "mailru",
       "name": "mailru",
-      "description": "my.mail.ru kullanıcı yüklemeleri + hesap taraması (Türkçe sesli / Türkçe adlı filmler)",
-      "version": "1.6.0",
+      "description": "my.mail.ru kullanıcı yüklemeleri (Türkçe sesli / Türkçe adlı filmler)",
+      "version": "1.5.6",
       "author": "custom",
       "supportedTypes": [
         "movie"
