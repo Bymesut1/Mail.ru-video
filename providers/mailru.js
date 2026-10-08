@@ -683,6 +683,11 @@ function rankItem(item, ctx) {
     return { score: 999, info: analyze(item.title), lang: 'TR', tier: 0, maybe: false };
   }
   var info = analyze(item.title);
+  // IMDb numarası BİREBİR tutuyorsa (tt0127624.A.Kid.in... gibi) dosya doğrudan kabul edilir: yıl/süre/ad bakılmaz
+  if (ctx.imdb && info.imdb === ctx.imdb) {
+    var li0 = langInfo(info);
+    if (li0.ok || li0.label === '?' || li0.label === 'Dual') return { score: 500, info: info, lang: li0.ok ? li0.label : 'TR', tier: 0, maybe: false };
+  }
   var imdbOk = !!(info.imdb && info.imdb === ctx.imdb);
   var nameOk = nameMatch(info, ctx.wants);
   if (info.imdb && ctx.imdb && info.imdb !== ctx.imdb) {                   // başka IMDb numarası: ad + yıl TAM tutuyorsa yükleyen numarayı yanlış yazmış olabilir
@@ -1077,6 +1082,7 @@ function buildQueries(imdb, year, titles, trTitles) {
   var names = uniq([tr1, t0].filter(Boolean));
   function add(q) { if (q) qs.push(q); }
   add(imdb);
+  add(imdb && imdb + ' TR');
   add(main);                                             // sadece ad: sitede "Kelebek etkisi" yazınca çıkanların hepsi
   add(main && main + y);
   add(t0 && t0 + y);
@@ -1123,7 +1129,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.9'];
+  dbg = ['v1.6.0'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -1177,7 +1183,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
     var sinks = queries.map(function () { return []; });
     var mainQ = (trWants[0] || titles[0] || '').replace(/\s+/g, ' ').trim();
     var jobs = queries.map(function (q, i) {
-      var pages = (q === mainQ || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
+      var pages = (q === mainQ || q === ctx.imdb || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
       return searchOnce(q, i + 1, pages, sinks[i]);
     });
     var hesapJobs = [];
@@ -1217,7 +1223,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
       dbg.push('aday ' + ranked.length);
 
       // Arama dosyayı getirmediyse: yükleyen hesabın kendi video listesini tara (garanti listesi ya da hiç aday yoksa)
-      var needScan = !ranked.length || (ctx.manuel.length && !ranked.some(function (x) { return x.r.score === 999; }));
+      var needScan = !ranked.length || (ctx.manuel.length && !ranked.some(function (x) { return x.r.score >= 500; }));
       var accs = needScan ? uniq((AYAR.HESAPLAR || []).concat(accountsOf(all).map(function (a) { return AYAR.MOBILE + a; }))) : [];
       var scanP = accs.length ? waitWithin(accs.map(function (u, ai) {
         var hs = [];
