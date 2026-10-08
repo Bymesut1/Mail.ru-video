@@ -9,7 +9,7 @@ var AYAR = {
   MOBILE: 'https://m.my.mail.ru',
   EKLENTI_ADI: 'mail.ru',
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
-  DEBUG_MODU: true,
+  DEBUG_MODU: false,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
@@ -17,9 +17,8 @@ var AYAR = {
   // GARANTİ LİSTESİ: sitede olduğunu bildiğin ama bulunamayan filmler. adlar: TMDB'deki herhangi bir ad, yil: TMDB yılı,
   // dosya: sitedeki TAM başlık. Bu filmde önce bu başlık aranır ve bulunursa (yıl/süre/dil bakılmadan) listeye girer.
   MANUEL: [
-    { adlar: ['The Tuxedo', 'Smokin'], yil: 2002, dosya: 'tt0290095.The.Tuxedo.2002.TR' },
-    { adlar: ["A Kid in Aladdin's Palace", "Alaaddin'in Sarayı"], yil: 1997, dosya: "tt0127624.A.Kid.in.Aladdin's.Palace.1997.TR" },
-    { adlar: ['First Blood', 'Rambo İlk Kan', 'Rambo'], yil: 1982, dosya: 'tt0083944.Rambo.First.Blood.1982.TR' }
+    { adlar: ['The Tuxedo', 'Smokin'], yil: 2002, dosya: 'tt.57556.Smokin.tr' },
+    { adlar: ["A Kid in Aladdin's Palace", "Alaaddin'in Sarayı"], yil: 1997, dosya: "Alaaddin'in Sarayı 1997 tr" }
   ],
   // ENGEL LİSTESİ: dosya adı filmle uyuşuyor ama içinde BAŞKA film çıkan yüklemeler. Bu filmde o dosya hiç gösterilmez.
   // (Sildiğin satırdaki dosya tekrar serbest kalır.)
@@ -27,9 +26,8 @@ var AYAR = {
     // örnek: { adlar: ['Film Adı'], yil: 2000, dosya: 'sitedeki.tam.baslik.tr' }
   ],
   // Yükleyen hesabın video listesi (ör. 'https://m.my.mail.ru/mail/KULLANICI/video/'). Doluysa her aramada bu sayfalar da taranır.
-  HESAPLAR: ['https://m.my.mail.ru/mail/muhammedgngr25/video/', 'https://m.my.mail.ru/mail/muhammedgngr25/video/_myvideo'],
-  HESAP_SAYFA: 12,  // hesap listesi taramasında en fazla kaç sayfa (107 video için fazlasıyla yeter)
-  HESAP_ONBELLEK_SN: 600, // taranan hesap listesi kaç saniye hafızada tutulsun
+  HESAPLAR: [],
+  HESAP_SAYFA: 5,   // hesap listesi taramasında en fazla kaç sayfa
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 5, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   ARAMA_SURESI: 4500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
@@ -683,11 +681,6 @@ function rankItem(item, ctx) {
     return { score: 999, info: analyze(item.title), lang: 'TR', tier: 0, maybe: false };
   }
   var info = analyze(item.title);
-  // IMDb numarası BİREBİR tutuyorsa (tt0127624.A.Kid.in... gibi) dosya doğrudan kabul edilir: yıl/süre/ad bakılmaz
-  if (ctx.imdb && info.imdb === ctx.imdb) {
-    var li0 = langInfo(info);
-    if (li0.ok || li0.label === '?' || li0.label === 'Dual') return { score: 500, info: info, lang: li0.ok ? li0.label : 'TR', tier: 0, maybe: false };
-  }
   var imdbOk = !!(info.imdb && info.imdb === ctx.imdb);
   var nameOk = nameMatch(info, ctx.wants);
   if (info.imdb && ctx.imdb && info.imdb !== ctx.imdb) {                   // başka IMDb numarası: ad + yıl TAM tutuyorsa yükleyen numarayı yanlış yazmış olabilir
@@ -788,7 +781,7 @@ function parseSearch(html) {
   var i, c;
   for (i = 1; i < chunks.length; i++) {
     c = chunks[i];
-    var path = (c.match(/my\.mail\.ru(\/[^"'#\s:?]*?\/video\/[^"'#\s:?]*?\/\d+\.html)/) || c.match(/href="(\/[^"'#\s:?]*?\/video\/[^"'#\s:?]*?\/\d+\.html)/) || [])[1];
+    var path = (c.match(/my\.mail\.ru(\/[^"'#\s:?]*?\/video\/[^"'#\s:?]*?\/\d+\.html)/) || [])[1];
     if (!path) continue;
     out.push({
       path: path,
@@ -831,75 +824,6 @@ function accountsOf(all) {
     if (m && /^ttt?\.?\d{3,7}/i.test(it.title)) cnt[m[1]] = (cnt[m[1]] || 0) + 1;
   });
   return Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 2);
-}
-
-
-// ---- Hesap önbelleği: hesabın TÜM video listesi bir kez taranır, sonraki aramalarda hazır kullanılır ----
-// Kullanıcı masaüstü adresi de verebilir (my.mail.ru/mail/KULLANICI/video): mobil adrese çevrilir.
-var HESAP_ONBELLEK = {};
-function hesapUrl(u) {
-  var m = String(u || '').match(/my\.mail\.ru\/(mail|list|inbox|bk|corp)\/([^\/?#]+)\/video(\/[^?#]*)?/i);
-  if (!m) return u;
-  return AYAR.MOBILE + '/' + m[1] + '/' + m[2] + '/video' + (m[3] || '/');   // /video/_myvideo gibi alt yol KORUNUR
-}
-// { items: [...] (taranırken doluyor), promise, time } — süre dolsa bile taranan kısım items'ta kalır
-function hesapTara(u) {
-  var url = hesapUrl(u), c = HESAP_ONBELLEK[url];
-  if (c && (Date.now() - c.time) < AYAR.HESAP_ONBELLEK_SN * 1000 && c.items.length) {
-    // Önbellek taze ama YENİ yüklenen videolar kaçmasın: liste en yeniden eskiye sıralı, bu yüzden
-    // her aramada sadece ilk sayfa(lar) yeniden okunur; önbellekte olmayanlar eklenir.
-    var kn = {};
-    c.items.forEach(function (it) { kn[it.path] = 1; });
-    var eklenen = 0;
-    function yenile(link, left) {
-      return getRaw(link, null, 'HY' + left).then(function (r) {
-        var items = r.ok ? parseSearch(r.text) : [];
-        if (!items.length) return;
-        var yeni = 0;
-        items.forEach(function (it) { if (!kn[it.path]) { kn[it.path] = 1; c.items.push(it); yeni++; eklenen++; } });
-        if (!yeni || left <= 1) return;                          // bu sayfada yeni yoksa daha eskilere gerek yok
-        var href = (String(r.text || '').match(/show-more[^>]*\shref="([^"]+)"/) || [])[1];
-        if (!href) return;
-        var nx = decodeHtml(href);
-        if (nx.indexOf('//') === 0) nx = 'https:' + nx; else if (nx.charAt(0) === '/') nx = AYAR.MOBILE + nx;
-        return yenile(nx, left - 1);
-      }, function () {});
-    }
-    return { items: c.items, time: c.time, promise: yenile(url, 3).then(function () {
-      if (eklenen) dbg.push('hesap: ' + eklenen + ' yeni video');
-      return c.items;
-    }) };
-  }
-  c = { items: [], time: Date.now(), promise: null };
-  HESAP_ONBELLEK[url] = c;
-  var seen = {};
-  function ekle(list) {
-    var n = 0;
-    list.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = 1; c.items.push(it); n++; } });
-    return n;
-  }
-  function sayfa(link, left) {
-    return getRaw(link, null, 'HS' + (AYAR.HESAP_SAYFA - left + 1)).then(function (r) {
-      var items = r.ok ? parseSearch(r.text) : [];
-      if (!items.length) return 0;
-      var yeni = ekle(items);
-      if (left <= 1 || !yeni) return yeni;                       // yeni video gelmediyse döngüyü kes
-      var href = (String(r.text || '').match(/show-more[^>]*\shref="([^"]+)"/) || [])[1];
-      if (!href) return yeni;
-      var nx = decodeHtml(href);
-      if (nx.indexOf('//') === 0) nx = 'https:' + nx; else if (nx.charAt(0) === '/') nx = AYAR.MOBILE + nx;
-      return sayfa(nx, left - 1).then(function (k) { return yeni + k; });
-    }, function () { return 0; });
-  }
-  c.promise = sayfa(url, AYAR.HESAP_SAYFA).then(function (n) {
-    if (n) return n;
-    // mobil adres boş döndüyse masaüstü adresi dene
-    return sayfa(url.replace(AYAR.MOBILE, AYAR.SITE), AYAR.HESAP_SAYFA);
-  }).then(function (n) {
-    dbg.push('hesap-listesi ' + c.items.length + ' video');
-    return c.items;
-  });
-  return c;
 }
 
 function morePages(html, items, left, tag, sink) {
@@ -1082,7 +1006,6 @@ function buildQueries(imdb, year, titles, trTitles) {
   var names = uniq([tr1, t0].filter(Boolean));
   function add(q) { if (q) qs.push(q); }
   add(imdb);
-  add(imdb && imdb + ' TR');
   add(main);                                             // sadece ad: sitede "Kelebek etkisi" yazınca çıkanların hepsi
   add(main && main + y);
   add(t0 && t0 + y);
@@ -1129,7 +1052,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.6.0'];
+  dbg = ['v1.5.6'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -1183,19 +1106,19 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
     var sinks = queries.map(function () { return []; });
     var mainQ = (trWants[0] || titles[0] || '').replace(/\s+/g, ' ').trim();
     var jobs = queries.map(function (q, i) {
-      var pages = (q === mainQ || q === ctx.imdb || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
+      var pages = (q === mainQ || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
       return searchOnce(q, i + 1, pages, sinks[i]);
     });
-    var hesapJobs = [];
-    (AYAR.HESAPLAR || []).forEach(function (u) {                           // senin hesabın: tüm video listesi
-      var c = hesapTara(u);
-      sinks.push(c.items);                                                 // taranan kısım süre dolsa bile kullanılır
-      hesapJobs.push(c.promise);
-      jobs.push(c.promise);
+    (AYAR.HESAPLAR || []).forEach(function (u, hi) {                       // yükleyen hesabın tüm listesi
+      var hs = [];
+      sinks.push(hs);
+      jobs.push(getRaw(u, null, 'H' + hi).then(function (r) {
+        var items = r.ok ? parseSearch(r.text) : [];
+        hs.push.apply(hs, items);
+        return items.length ? morePages(r.text, items, AYAR.HESAP_SAYFA, 'H' + hi, hs) : items;
+      }));
     });
     return waitSome(jobs, Math.min(jobs.length, 14), AYAR.ARAMA_SURESI).then(function () {
-      return hesapJobs.length ? waitWithin(hesapJobs, 1500) : null;
-    }).then(function () {
       var seen = {}, all = [];
       sinks.forEach(function (l) {
         l.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = true; all.push(it); } });
@@ -1223,13 +1146,11 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
       dbg.push('aday ' + ranked.length);
 
       // Arama dosyayı getirmediyse: yükleyen hesabın kendi video listesini tara (garanti listesi ya da hiç aday yoksa)
-      var needScan = !ranked.length || (ctx.manuel.length && !ranked.some(function (x) { return x.r.score >= 500; }));
+      var needScan = !ranked.length || (ctx.manuel.length && !ranked.some(function (x) { return x.r.score === 999; }));
       var accs = needScan ? uniq((AYAR.HESAPLAR || []).concat(accountsOf(all).map(function (a) { return AYAR.MOBILE + a; }))) : [];
       var scanP = accs.length ? waitWithin(accs.map(function (u, ai) {
         var hs = [];
-        var isim = (AYAR.HESAPLAR || []).some(function (h) { return hesapUrl(h) === hesapUrl(u); });
-        var tara = isim ? hesapTara(u).promise.then(function (l) { hs.push.apply(hs, l); }) : scanList(u, AYAR.HESAP_SAYFA, hs, ai);
-        return tara.then(function () {
+        return scanList(u, AYAR.HESAP_SAYFA, hs, ai).then(function () {
           var add = 0;
           hs.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = true; all.push(it); add++; } });
           dbg.push('hesap ' + u.replace(/^https?:\/\/[^\/]+/, '') + ' +' + add);
