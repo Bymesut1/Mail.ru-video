@@ -10,9 +10,35 @@ var AYAR = {
   EKLENTI_ADI: 'mail.ru',
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
   DEBUG_MODU: false,
-  MAX_ADAY: 10,    // en fazla kaç aday video için kaynak çekilsin
-  MAX_SORGU: 10,   // en fazla kaç arama yapılsın
-  MAX_SAYFA: 2     // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
+  MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
+  MAX_SORGU: 14,   // en fazla kaç arama yapılsın
+  MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
+  MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
+  ARAMA_SURESI: 9000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
+  KAYNAK_SURESI: 7000  // ms: kaynak çekme aşaması en geç bu sürede biter
+};
+
+// Türkçe adı TMDB'de görünmeyen / farklı yazılan filmler: orijinal ad (harf-rakam, küçük) -> Türkçe adlar
+var TR_ALIAS = {
+  'nationaltreasure': ['Harbi Define'],
+  'nationaltreasurebookofsecrets': ['Harbi Define 2'],
+  'thebutterflyeffect': ['Kelebek Etkisi'],
+  'thebutterflyeffect2': ['Kelebek Etkisi 2'],
+  'thebutterflyeffect3revelations': ['Kelebek Etkisi 3'],
+  'themummy': ['Mumya'],
+  'themummyreturns': ['Mumya Geri Dönüyor', 'Mumya 2'],
+  'themummytombofthedragonemperor': ['Mumya 3', 'Mumya Ejderha İmparatorunun Mezarı'],
+  'diehard': ['Zor Ölüm'],
+  'diehard2': ['Zor Ölüm 2'],
+  'diehardwithavengeance': ['Zor Ölüm 3'],
+  'livefreeordiehard': ['Zor Ölüm 4', 'Zor Ölüm 4.0'],
+  'agooddaytodiehard': ['Zor Ölüm 5'],
+  'insidious': ['Ruhlar Bölgesi'],
+  'insidiouschapter2': ['Ruhlar Bölgesi Bölüm 2', 'Ruhlar Bölgesi 2'],
+  'insidiouschapter3': ['Ruhlar Bölgesi Bölüm 3', 'Ruhlar Bölgesi 3'],
+  'insidiousthelastkey': ['Ruhlar Bölgesi Son Anahtar', 'Ruhlar Bölgesi 4'],
+  'insidioustheredddoor': ['Ruhlar Bölgesi Kırmızı Kapı', 'Ruhlar Bölgesi 5'],
+  'insidiousthereddoor': ['Ruhlar Bölgesi Kırmızı Kapı', 'Ruhlar Bölgesi 5']
 };
 
 var TMDB_KEY = '000316508321ce461cf81e7c6815eec7';
@@ -45,14 +71,14 @@ function pageHeaders(extra) {
 
 // { status, ok, text, cookie }  — cookie: yanıttaki video_key (varsa)
 function getRaw(url, headers, label) {
-  return withTimeout(fetch(url, { headers: headers || pageHeaders() }), 10000).then(function (res) {
+  return withTimeout(fetch(url, { headers: headers || pageHeaders() }), 8000).then(function (res) {
     var cookie = '';
     try {
       var sc = res.headers && res.headers.get && res.headers.get('set-cookie');
       var m = String(sc || '').match(/video_key=([^;,\s]+)/);
       if (m) cookie = m[1];
     } catch (e) {}
-    return withTimeout(res.text(), 10000).then(
+    return withTimeout(res.text(), 8000).then(
       function (t) { return { status: res.status, ok: res.ok, text: t || '', cookie: cookie }; },
       function () { return { status: res.status, ok: false, text: '', cookie: cookie }; }
     );
@@ -79,6 +105,34 @@ function asciiLower(s) {
     .replace(/[çğıöşüâîû]/g, function (c) { return TR_MAP[c]; });
 }
 function norm(s) { return asciiLower(s).replace(/[^a-z0-9]/g, ''); }
+// Türkçe harfleri sadeleştir (büyük/küçük harf korunur): "Zor Ölüm" -> "Zor Olum"
+var TR_PLAIN = { 'ç': 'c', 'Ç': 'C', 'ğ': 'g', 'Ğ': 'G', 'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ş': 's', 'Ş': 'S', 'ü': 'u', 'Ü': 'U' };
+function plain(s) { return String(s || '').replace(/[çÇğĞıİöÖşŞüÜ]/g, function (c) { return TR_PLAIN[c]; }); }
+// Ünsüz iskeleti: "Captain Phillips" ~ "Kptn.Phlps" (yükleyen kısaltmış)
+function skel(s) {
+  return asciiLower(s).replace(/[^a-z0-9]/g, '').replace(/c/g, 'k').replace(/[aeiou]/g, '').replace(/(.)\1+/g, '$1');
+}
+function hasTrChars(s) { return /[çğışöüÇĞİŞÖÜ]/.test(String(s || '')); }
+// Hepsi bitince ya da süre dolunca devam et (biten sonuçlar kullanılır, bitmeyenler atlanır)
+function waitWithin(promises, ms) {
+  return new Promise(function (resolve) {
+    var left = promises.length, done = false;
+    if (!left) { resolve(); return; }
+    var t = setTimeout(function () { if (!done) { done = true; resolve(); } }, ms);
+    promises.forEach(function (p) {
+      p.then(function () {}, function () {}).then(function () {
+        left--;
+        if (left === 0 && !done) { done = true; clearTimeout(t); resolve(); }
+      });
+    });
+  });
+}
+function aliasNames(list) {
+  var out = [];
+  list.forEach(function (t) { var a = TR_ALIAS[norm(t)]; if (a) out = out.concat(a); });
+  return uniq(out);
+}
+
 function uniq(list) {
   var out = [];
   list.forEach(function (x) { if (x && out.indexOf(x) === -1) out.push(x); });
@@ -131,7 +185,13 @@ function sigTokens(s) {
 
 // Yüklenen dosya adı: tt0088763.Back.to.the.Future.Part.I.1985.1080p.TR.dual
 function analyze(title) {
-  var toks = asciiLower(title).split(/[^a-z0-9]+/).filter(Boolean);
+  var toks = [];
+  asciiLower(title).split(/[^a-z0-9]+/).filter(Boolean).forEach(function (t) {
+    // "2trdub", "2013tr", "trdub2" gibi rakama yapışık etiketleri ayır
+    var m = t.match(/^(\d{1,4})(tr|trdub|trdublaj|dublaj|dual|turkce|altyazi|altyazili)$/) ||
+            t.match(/^(tr|trdub|trdublaj|dublaj|dual|turkce)(\d{1,2})$/);
+    if (m) { toks.push(m[1]); toks.push(m[2]); } else toks.push(t);
+  });
   var info = { imdb: '', years: [], res: 0, tags: {}, words: [], nums: [], part: 0, bag: toks };
   toks.forEach(function (t) {
     var m;
@@ -192,6 +252,34 @@ function partialName(info, wants) {
   return false;
 }
 
+// Ünsüz iskeleti eşleşmesi (Kptn.Phlps ~ Captain Phillips). Sadece yıl TAM + süre ±%6 ise kabul edilir.
+function skelMatch(info, wants) {
+  var js = skel(info.joined || '');
+  for (var i = 0; i < wants.length; i++) {
+    var ww = sigTokens(wants[i]).words;
+    if (!ww.length) continue;
+    var sk = skel(ww.join(''));
+    if (sk.length >= 6 && js.indexOf(sk) > -1) return true;
+  }
+  return false;
+}
+
+// Ses parçası bilgisinde Türkçe geçiyor mu (mail.ru meta JSON'unda ses/dil alanları)
+function metaTurkishAudio(m) {
+  var found = false, KEY = /audio|track|dub|voice|sound|language/i, VAL = /^(tr|tur|trk|turkish|turkce|türkçe)$/i;
+  function walk(o, key, depth) {
+    if (found || o === null || o === undefined || depth > 6) return;
+    if (typeof o === 'string') { if (key && VAL.test(o.trim())) found = true; return; }
+    if (typeof o !== 'object') return;
+    Object.keys(o).forEach(function (k) {
+      if (k === 'videos') return;
+      walk(o[k], KEY.test(k) ? k : key, depth + 1);
+    });
+  }
+  try { walk((m && m.raw) || (m && m.meta) || {}, '', 0); } catch (e) {}
+  return found;
+}
+
 // Dil etiketi. Sadece TÜRKÇE SES kabul edilir:
 //   TR / TR Dublaj / Türkçe Dublaj / TR Dual  -> ok (tier 0)
 //   TR Altyazı (ses orijinal), sadece Dual, EN, RU, AR, ... -> ok değil
@@ -217,20 +305,23 @@ function rankItem(item, ctx) {
   if (info.imdb && ctx.imdb && info.imdb !== ctx.imdb) return null;       // başka filmin IMDb numarası
   var imdbOk = !!(info.imdb && info.imdb === ctx.imdb);
   var nameOk = nameMatch(info, ctx.wants);
-  var partial = false;
+  var partial = false, skelOk = false;
   if (!imdbOk && !nameOk) {
-    if (partialName(info, ctx.wants)) partial = true; else return null;
+    if (partialName(info, ctx.wants)) partial = true;
+    else if (skelMatch(info, ctx.wants)) skelOk = true;
+    else return null;
   }
+  var loose = partial || skelOk;   // zayıf ad eşleşmesi: yıl + süre şart
 
   var score = 0;
   if (imdbOk) score += 100;
   if (nameOk) score += 20;
-  if (partial) score += 10;
+  if (loose) score += 10;
 
   if (info.years.length && ctx.year) {
     var yd = 99;
     info.years.forEach(function (y) { yd = Math.min(yd, Math.abs(y - ctx.year)); });
-    if (partial && yd !== 0) return null;
+    if (loose && yd !== 0) return null;
     if (yd === 0) score += 30;
     else if (yd === 1) score += 15;
     else if (!imdbOk) return null;                                        // farklı yıl = devam filmi/başka film
@@ -240,7 +331,7 @@ function rankItem(item, ctx) {
   if (item.dur) {
     if (ctx.runtime) {
       var r = item.dur / (ctx.runtime * 60), d = Math.abs(r - 1);
-      if (partial && d > 0.06) return null;
+      if (loose && d > 0.06) return null;
       if (d <= 0.06) score += 25;
       else if (d <= 0.15) score += 10;
       else if (d <= 0.3) score += 0;                                      // uzatılmış/kısaltılmış kurgu
@@ -251,19 +342,29 @@ function rankItem(item, ctx) {
     }
   }
 
-  if (partial && (!item.dur || !info.years.length)) return null;       // kısmi eşleşme: yıl ve süre ŞART
+  if (loose && (!item.dur || !info.years.length)) return null;         // zayıf eşleşme: yıl ve süre ŞART
   var li = langInfo(info);
   if (/[\u0400-\u04FF]/.test(item.title) && !li.ok) return null;       // Rusça (Kiril) başlık
+  var maybe = false;
   if (!li.ok) {
-    // Etiket yok: sadece TÜRKÇE adla yüklenmişse (Geleceğe Dönüş...) ve başka dil/altyazı etiketi yoksa Türkçe say
-    var trNameOk = ctx.trWants && ctx.trWants.length && nameMatch(info, ctx.trWants);
-    if (trNameOk && !li.foreign && !li.sub && !li.en && li.label === '?') li = { label: 'TR Ad', tier: 1, ok: true };
-    else return null;                                                    // EN / RU / AR / altyazılı / Dual(TR yok) / etiketsiz
+    var clean = !li.foreign && !li.sub && !li.en;                        // başka dil / altyazı / EN etiketi yok
+    var trNameOk = !!(ctx.trWants && ctx.trWants.length && nameMatch(info, ctx.trWants));
+    var trChars = hasTrChars(item.title);
+    if (clean && li.label === '?' && (trNameOk || trChars)) {
+      // Etiket yok ama Türkçe adla ya da Türkçe harflerle yazılmış: Türkçe say
+      // (yıl yoksa süre ±%8 içinde olmalı; başka filmle karışmasın)
+      var rr = (ctx.runtime && item.dur) ? Math.abs(item.dur / (ctx.runtime * 60) - 1) : 1;
+      if (!imdbOk && !info.years.length && rr > 0.08) return null;
+      li = { label: trChars ? 'TR Yazı' : 'TR Ad', tier: 1, ok: true };
+    } else if (clean && (li.label === '?' || li.label === 'Dual') && (imdbOk || nameOk)) {
+      maybe = true;                                                      // ses parçası meta bilgisinden doğrulanacak
+      li = { label: 'TR Ses', tier: 2, ok: true };
+    } else return null;                                                  // EN / RU / AR / altyazılı
   }
   if (info.res >= 2160) score += 4; else if (info.res >= 1080) score += 3; else if (info.res >= 720) score += 2;
 
   if (score < 40) return null;
-  return { score: score, info: info, lang: li.label, tier: li.tier };
+  return { score: score, info: info, lang: li.label, tier: li.tier, maybe: maybe };
 }
 
 // ---------------- Arama sonucu ayrıştırma ----------------
@@ -301,7 +402,7 @@ function parseSearch(html) {
 }
 
 // Çok sonuç dönen aramalarda "Show more" bağlantısını izleyip ek sayfaları da oku
-function morePages(html, items, left, tag) {
+function morePages(html, items, left, tag, sink) {
   if (left <= 0 || items.length < 30) return Promise.resolve(items);
   var href = (String(html || '').match(/show-more[^>]*\shref="([^"]+)"/) || [])[1];
   if (!href) return Promise.resolve(items);
@@ -310,17 +411,24 @@ function morePages(html, items, left, tag) {
   return getRaw(url, null, 'P' + tag).then(function (r) {
     var more = r.ok ? parseSearch(r.text) : [];
     if (!more.length) return items;
-    return morePages(r.text, items.concat(more), left - 1, tag);
+    if (sink) sink.push.apply(sink, more);
+    return morePages(r.text, items.concat(more), left - 1, tag, sink);
   });
 }
 
-function searchOnce(q, tag, pages) {
+// Bulunan sonuçlar hemen `sink` listesine yazılır (süre dolsa bile biten kısım kullanılır)
+function searchOnce(q, tag, pages, sink) {
   var enc = encodeURIComponent(q);
   return getRaw(AYAR.MOBILE + '/video/search?st=search&q=' + enc, null, 'S' + tag).then(function (r) {
     var items = r.ok ? parseSearch(r.text) : [];
-    if (items.length) return pages > 0 ? morePages(r.text, items, pages, tag) : items;
+    if (items.length) {
+      sink.push.apply(sink, items);
+      return pages > 0 ? morePages(r.text, items, pages, tag, sink) : items;
+    }
     return getRaw(AYAR.SITE + '/video/search?st=search&q=' + enc, null, 'D' + tag).then(function (r2) {
-      return r2.ok ? parseSearch(r2.text) : [];
+      var it2 = r2.ok ? parseSearch(r2.text) : [];
+      sink.push.apply(sink, it2);
+      return it2;
     });
   });
 }
@@ -341,7 +449,7 @@ function fetchMeta(item) {
       try { data = JSON.parse(r.text); } catch (e) { return null; }
       var vids = (data && data.videos) || [];
       if (!vids.length) return null;
-      return { videos: vids, cookie: r.cookie, meta: data.meta || {} };
+      return { videos: vids, cookie: r.cookie, meta: data.meta || {}, raw: data };
     });
   }
 
@@ -418,18 +526,28 @@ function debugStream(msg) {
 
 function dotted(s) { return String(s || '').replace(/[:\-–—!?,.'"’&]+/g, ' ').trim().replace(/\s+/g, '.'); }
 
-// Sorgular: IMDb numarası, ad+yıl, noktalı yazım ve Türkçe dublaj etiketli varyantlar
-function buildQueries(imdb, year, titles) {
-  var qs = [];
-  if (imdb) {
-    qs.push(imdb);
-    if (titles[0]) qs.push(imdb + '.' + dotted(titles[0]) + (year ? '.' + year : ''));
-  }
-  titles.slice(0, 3).forEach(function (t) { qs.push(t + (year ? ' ' + year : '')); });
-  titles.slice(0, 3).forEach(function (t) { qs.push(t + ' Türkçe Dublaj'); });
-  titles.slice(0, 2).forEach(function (t) { qs.push(dotted(t) + (year ? '.' + year : '')); });
-  titles.slice(0, 2).forEach(function (t) { qs.push(t + ' TR Dual'); });
-  titles.slice(0, 3).forEach(function (t) { qs.push(t); });
+// Sorgular (öncelik sırasıyla; MAX_SORGU kadarı kullanılır)
+function buildQueries(imdb, year, titles, trTitles) {
+  var qs = [], y = year ? ' ' + year : '', dy = year ? '.' + year : '';
+  var tr1 = (trTitles || [])[0] || '', tr2 = (trTitles || [])[1] || '';
+  var t0 = titles[0] || '', t1 = titles[1] || '', t2 = titles[2] || '';
+  function add(q) { if (q) qs.push(q); }
+  add(imdb);
+  add(tr1 && tr1 + y);
+  add(t0 && t0 + y);
+  add(tr1 && tr1 + ' Türkçe Dublaj');
+  add(t0 && t0 + ' Türkçe Dublaj');
+  add(tr1 && plain(tr1) !== tr1 && plain(tr1) + y);        // "Zor Olum 1988"
+  add(imdb && t0 && imdb + '.' + dotted(t0) + dy);
+  add(t0 && dotted(t0) + dy);
+  add(tr1 && dotted(plain(tr1)) + dy);                     // "Zor.Olum.1988"
+  add(tr2 && tr2 + y);
+  add(t1 && t1 + y);
+  add(t0 && t0 + ' TR Dual');
+  add(tr1);
+  add(tr1 && plain(tr1) !== tr1 && plain(tr1));
+  add(t2 && t2 + y);
+  add(t0);
   return uniq(qs.map(function (q) { return String(q || '').replace(/\s+/g, ' ').trim(); }).filter(function (q) { return q.length >= 3; }))
     .slice(0, AYAR.MAX_SORGU);
 }
@@ -460,16 +578,19 @@ function getStreams(tmdbId, mediaType, season, episode) {
       });
     } catch (e) {}
     var titles = uniq([info.original_title, en.title, info.title]);
-    var wants = uniq(titles.concat(alts.slice(0, 8)));
+    var aliasTr = aliasNames([info.original_title, en.title, info.title]);   // bilinen Türkçe adlar (Zor Ölüm, Mumya...)
+    var wants = uniq(titles.concat(aliasTr).concat(alts.slice(0, 8)));
     var nonTr = [norm(info.original_title), norm(en.title)];
-    var trWants = uniq([info.title].concat(trAlts)).filter(function (t) { return t && nonTr.indexOf(norm(t)) === -1; });
+    var trWants = uniq(aliasTr.concat([info.title]).concat(trAlts)).filter(function (t) { return t && nonTr.indexOf(norm(t)) === -1; });
     var ctx = { imdb: info.imdb_id || '', year: year, runtime: info.runtime || en.runtime || 0, wants: wants, trWants: trWants };
     dbg.push('film ' + (info.original_title || info.title) + ' ' + year + ' ' + (ctx.imdb || '-') + ' ' + ctx.runtime + 'dk');
 
-    var queries = buildQueries(ctx.imdb, year, titles);
-    return Promise.all(queries.map(function (q, i) { return searchOnce(q, i + 1, i < 4 ? AYAR.MAX_SAYFA : 0); })).then(function (lists) {
+    var queries = buildQueries(ctx.imdb, year, titles, trWants);
+    var sinks = queries.map(function () { return []; });
+    var jobs = queries.map(function (q, i) { return searchOnce(q, i + 1, i < 4 ? AYAR.MAX_SAYFA : 0, sinks[i]); });
+    return waitWithin(jobs, AYAR.ARAMA_SURESI).then(function () {
       var seen = {}, all = [];
-      lists.forEach(function (l) {
+      sinks.forEach(function (l) {
         l.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = true; all.push(it); } });
       });
       dbg.push('sonuc ' + all.length);
@@ -484,13 +605,22 @@ function getStreams(tmdbId, mediaType, season, episode) {
       dbg.push('aday ' + ranked.length);
       if (!ranked.length) return debugStream('uygun video yok: ' + (info.title || info.original_title) + ' ' + year);
 
-      var top = ranked.slice(0, AYAR.MAX_ADAY);
-      return Promise.all(top.map(function (x) {
-        return fetchMeta(x.item).catch(function () { return null; });
-      })).then(function (metas) {
+      // kesin Türkçe adaylar + (etiketsiz / sadece Dual) birkaç belirsiz aday: bunların ses parçası kontrol edilir
+      var sure = ranked.filter(function (x) { return !x.r.maybe; }).slice(0, AYAR.MAX_ADAY);
+      var unsure = ranked.filter(function (x) { return x.r.maybe; }).slice(0, AYAR.MAX_BELIRSIZ);
+      var top = sure.concat(unsure);
+      var metas = top.map(function () { return null; });
+      var metaJobs = top.map(function (x, i) {
+        return fetchMeta(x.item).then(function (m) { metas[i] = m; }, function () {});
+      });
+      return waitWithin(metaJobs, AYAR.KAYNAK_SURESI).then(function () {
         var streams = [], seenUrl = {};
         top.forEach(function (x, i) {
           if (!metas[i]) { dbg.push('meta yok ' + x.item.path); return; }
+          if (x.r.maybe) {
+            try { dbg.push('ses alani ' + Object.keys(metas[i].raw || {}).join(',') + '|' + Object.keys(metas[i].meta || {}).slice(0, 12).join(',')); } catch (e) {}
+            if (!metaTurkishAudio(metas[i])) { dbg.push('ses TR degil ' + x.item.title.slice(0, 30)); return; }
+          }
           makeStreams(x.item, x.r, metas[i]).forEach(function (s) {
             if (!seenUrl[s.url]) { seenUrl[s.url] = true; streams.push(s); }
           });
@@ -503,7 +633,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getStreams: getStreams, _t: { langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries } };
+  module.exports = { getStreams: getStreams, _t: { skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries } };
 } else {
   global.getStreams = getStreams;
 }
