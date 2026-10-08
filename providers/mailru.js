@@ -11,7 +11,7 @@ var AYAR = {
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
   DEBUG_MODU: false,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
-  MAX_SORGU: 14,   // en fazla kaç arama yapılsın
+  MAX_SORGU: 30,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
   BELIRSIZ_GOSTER: false, // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
@@ -42,6 +42,162 @@ var TR_ALIAS = {
   'insidioustheredddoor': ['Ruhlar Bölgesi Kırmızı Kapı', 'Ruhlar Bölgesi 5'],
   'insidiousthereddoor': ['Ruhlar Bölgesi Kırmızı Kapı', 'Ruhlar Bölgesi 5']
 };
+
+// Ek Türkçe adlar: [orijinal/İngilizce ad, [Türkçe adlar...]]. Yükleyenler hem resmi adı hem "yabancı + Türkçe karışık" adı kullanır.
+var TR_ALIAS_EK = [
+  ['The Terminator', ['Terminatör', 'Terminator']],
+  ['Terminator 2: Judgment Day', ['Terminatör 2: Mahşer Günü', 'Terminatör 2: Kıyamet Günü', 'Terminator 2 Kıyamet Günü', 'Terminatör 2']],
+  ['Terminator 3: Rise of the Machines', ['Terminatör 3: Makinelerin Yükselişi', 'Terminator 3 Makinelerin Yükselişi', 'Terminatör 3']],
+  ['Terminator Salvation', ['Terminatör Kurtuluş', 'Terminator Kurtuluş', 'Terminatör 4']],
+  ['Terminator Genisys', ['Terminatör Genisys', 'Terminatör 5']],
+  ['Terminator: Dark Fate', ['Terminatör Kara Kader', 'Terminatör Kader', 'Terminator Dark Fate']],
+  ['Home Alone', ['Evde Tek Başına']],
+  ['Home Alone 2: Lost in New York', ['Evde Tek Başına 2', 'Evde Tek Başına 2 New York\'ta Kayıp']],
+  ['Pirates of the Caribbean: The Curse of the Black Pearl', ['Karayip Korsanları Siyah İnci\'nin Laneti', 'Karayip Korsanları 1']],
+  ['Pirates of the Caribbean: Dead Man\'s Chest', ['Karayip Korsanları Ölü Adamın Sandığı', 'Karayip Korsanları 2']],
+  ['Pirates of the Caribbean: At World\'s End', ['Karayip Korsanları Dünyanın Sonu', 'Karayip Korsanları 3']],
+  ['Pirates of the Caribbean: On Stranger Tides', ['Karayip Korsanları Gizemli Denizlerde', 'Karayip Korsanları 4']],
+  ['Pirates of the Caribbean: Dead Men Tell No Tales', ['Karayip Korsanları Salazar\'ın İntikamı', 'Karayip Korsanları 5']],
+  ['The Lord of the Rings: The Fellowship of the Ring', ['Yüzüklerin Efendisi Yüzük Kardeşliği', 'Yüzüklerin Efendisi 1']],
+  ['The Lord of the Rings: The Two Towers', ['Yüzüklerin Efendisi İki Kule', 'Yüzüklerin Efendisi 2']],
+  ['The Lord of the Rings: The Return of the King', ['Yüzüklerin Efendisi Kralın Dönüşü', 'Yüzüklerin Efendisi 3']],
+  ['The Hobbit: An Unexpected Journey', ['Hobbit Beklenmedik Yolculuk', 'Hobbit 1']],
+  ['The Hobbit: The Desolation of Smaug', ['Hobbit Smaug\'un Çorak Toprakları', 'Hobbit 2']],
+  ['The Hobbit: The Battle of the Five Armies', ['Hobbit Beş Ordunun Savaşı', 'Hobbit 3']],
+  ['Harry Potter and the Philosopher\'s Stone', ['Harry Potter ve Felsefe Taşı', 'Harry Potter 1']],
+  ['Harry Potter and the Sorcerer\'s Stone', ['Harry Potter ve Felsefe Taşı', 'Harry Potter 1']],
+  ['Harry Potter and the Chamber of Secrets', ['Harry Potter ve Sırlar Odası', 'Harry Potter 2']],
+  ['Harry Potter and the Prisoner of Azkaban', ['Harry Potter ve Azkaban Tutsağı', 'Harry Potter 3']],
+  ['Harry Potter and the Goblet of Fire', ['Harry Potter ve Ateş Kadehi', 'Harry Potter 4']],
+  ['Harry Potter and the Order of the Phoenix', ['Harry Potter ve Zümrüdüanka Yoldaşlığı', 'Harry Potter 5']],
+  ['Harry Potter and the Half-Blood Prince', ['Harry Potter ve Melez Prens', 'Harry Potter 6']],
+  ['Harry Potter and the Deathly Hallows: Part 1', ['Harry Potter ve Ölüm Yadigârları Bölüm 1', 'Harry Potter 7']],
+  ['Harry Potter and the Deathly Hallows: Part 2', ['Harry Potter ve Ölüm Yadigârları Bölüm 2', 'Harry Potter 8']],
+  ['The Fast and the Furious', ['Hızlı ve Öfkeli', 'Hızlı ve Öfkeli 1']],
+  ['2 Fast 2 Furious', ['Daha Hızlı Daha Öfkeli', 'Hızlı ve Öfkeli 2']],
+  ['The Fast and the Furious: Tokyo Drift', ['Hızlı ve Öfkeli Tokyo Yarışı', 'Hızlı ve Öfkeli 3']],
+  ['Fast & Furious', ['Hızlı ve Öfkeli 4']],
+  ['Fast Five', ['Hızlı ve Öfkeli 5']],
+  ['Fast & Furious 6', ['Hızlı ve Öfkeli 6']],
+  ['Furious 7', ['Hızlı ve Öfkeli 7']],
+  ['The Fate of the Furious', ['Hızlı ve Öfkeli 8']],
+  ['Mission: Impossible', ['Görevimiz Tehlike']],
+  ['Mission: Impossible II', ['Görevimiz Tehlike 2']],
+  ['Mission: Impossible III', ['Görevimiz Tehlike 3']],
+  ['Mission: Impossible - Ghost Protocol', ['Görevimiz Tehlike Hayalet Protokol', 'Görevimiz Tehlike 4']],
+  ['The Godfather', ['Baba']],
+  ['The Godfather Part II', ['Baba 2']],
+  ['The Godfather Part III', ['Baba 3']],
+  ['Pulp Fiction', ['Ucuz Roman']],
+  ['Fight Club', ['Dövüş Kulübü']],
+  ['Gladiator', ['Gladyatör']],
+  ['The Shawshank Redemption', ['Esaretin Bedeli']],
+  ['Inception', ['Başlangıç']],
+  ['Batman Begins', ['Batman Başlıyor']],
+  ['The Dark Knight', ['Kara Şövalye']],
+  ['The Dark Knight Rises', ['Kara Şövalye Yükseliyor']],
+  ['Interstellar', ['Yıldızlararası']],
+  ['The Avengers', ['Yenilmezler']],
+  ['Avengers: Age of Ultron', ['Yenilmezler Ultron Çağı']],
+  ['Avengers: Infinity War', ['Yenilmezler Sonsuzluk Savaşı']],
+  ['Avengers: Endgame', ['Yenilmezler Son Oyun', 'Yenilmezler 4 Son Oyun']],
+  ['Saving Private Ryan', ['Er Ryan\'ı Kurtarmak']],
+  ['Catch Me If You Can', ['Sıkıysa Yakala']],
+  ['Shutter Island', ['Zindan Adası']],
+  ['The Prestige', ['Prestij']],
+  ['Se7en', ['Yedi', 'Seven']],
+  ['The Silence of the Lambs', ['Kuzuların Sessizliği']],
+  ['The Lion King', ['Aslan Kral']],
+  ['Finding Nemo', ['Kayıp Balık Nemo']],
+  ['Finding Dory', ['Kayıp Balık Dory']],
+  ['Toy Story', ['Oyuncak Hikayesi']],
+  ['Toy Story 2', ['Oyuncak Hikayesi 2']],
+  ['Toy Story 3', ['Oyuncak Hikayesi 3']],
+  ['Toy Story 4', ['Oyuncak Hikayesi 4']],
+  ['Ice Age', ['Buz Devri']],
+  ['Taken', ['Kiralık Katil']],
+  ['Taken 2', ['Kiralık Katil 2']],
+  ['Taken 3', ['Kiralık Katil 3']],
+  ['Now You See Me', ['Sihirbazlar Çetesi']],
+  ['Now You See Me 2', ['Sihirbazlar Çetesi 2']],
+  ['The Hangover', ['Felekten Bir Gece']],
+  ['The Hangover Part II', ['Felekten Bir Gece 2']],
+  ['The Hangover Part III', ['Felekten Bir Gece 3']],
+  ['Man of Steel', ['Çelik Adam']],
+  ['Black Swan', ['Siyah Kuğu']],
+  ['A Beautiful Mind', ['Akıl Oyunları']],
+  ['Scarface', ['Yüzü Yaralı Adam']],
+  ['Dances with Wolves', ['Kurtlarla Dans']],
+  ['Braveheart', ['Cesur Yürek']],
+  ['Blade Runner', ['Bıçak Sırtı']],
+  ['Gone Girl', ['Kayıp Kız']],
+  ['Memento', ['Akıl Defteri']],
+  ['American Beauty', ['Amerikan Güzeli']],
+  ['The Green Mile', ['Yeşil Yol']],
+  ['Taxi Driver', ['Taksi Şoförü']],
+  ['The Departed', ['Köstebek']],
+  ['Django Unchained', ['Zincirsiz']],
+  ['Inglourious Basterds', ['Soysuzlar Çetesi']],
+  ['The Wolf of Wall Street', ['Para Avcısı']],
+  ['The Revenant', ['Diriliş']],
+  ['Gravity', ['Yerçekimi']],
+  ['Mad Max: Fury Road', ['Çılgın Max Öfkeli Yollar']],
+  ['Spider-Man', ['Örümcek Adam']],
+  ['Spider-Man 2', ['Örümcek Adam 2']],
+  ['Spider-Man 3', ['Örümcek Adam 3']],
+  ['The Amazing Spider-Man', ['Muhteşem Örümcek Adam']],
+  ['Spider-Man: Homecoming', ['Örümcek Adam Eve Dönüş']],
+  ['Spider-Man: Far From Home', ['Örümcek Adam Eve Uzak']],
+  ['Spider-Man: No Way Home', ['Örümcek Adam Eve Dönüş Yok']],
+  ['RoboCop', ['Robot Polis']],
+  ['Lethal Weapon', ['Ölümcül Silah']],
+  ['Lethal Weapon 2', ['Ölümcül Silah 2']],
+  ['Lethal Weapon 3', ['Ölümcül Silah 3']],
+  ['First Blood', ['Rambo İlk Kan', 'Rambo 1']],
+  ['Con Air', ['Kaçış Uçağı']],
+  ['The Rock', ['Kaya']],
+  ['Raiders of the Lost Ark', ['Kayıp Hazine Avcıları', 'Indiana Jones Kayıp Hazine Avcıları']],
+  ['Indiana Jones and the Temple of Doom', ['Indiana Jones ve Ölüm Tapınağı']],
+  ['Indiana Jones and the Last Crusade', ['Indiana Jones ve Son Macera']],
+  ['Rain Man', ['Yağmur Adam']],
+  ['The Pursuit of Happyness', ['Umudunu Kaybetme']],
+  ['Eternal Sunshine of the Spotless Mind', ['Sil Baştan']],
+  ['Good Will Hunting', ['Can Dostum']],
+  ['Dead Poets Society', ['Ölü Ozanlar Derneği']],
+  ['Life Is Beautiful', ['Hayat Güzeldir']],
+  ['The Pianist', ['Piyanist']],
+  ['Schindler\'s List', ['Schindler\'in Listesi']],
+  ['The Usual Suspects', ['Olağan Şüpheliler']],
+  ['Seven Pounds', ['Yedi Ruh']],
+  ['Despicable Me', ['Çılgın Hırsız']],
+  ['Despicable Me 2', ['Çılgın Hırsız 2']],
+  ['Minions', ['Minyonlar']],
+  ['How to Train Your Dragon', ['Ejderhanı Nasıl Eğitirsin']],
+  ['Cars', ['Arabalar']],
+  ['Monsters, Inc.', ['Sevimli Canavarlar']],
+  ['The Incredibles', ['İnanılmaz Aile']],
+  ['Up', ['Yukarı Bak']],
+  ['Ratatouille', ['Ratatuy']],
+  ['Inside Out', ['Ters Yüz']],
+  ['Frozen', ['Karlar Ülkesi']],
+  ['Tangled', ['Karmakarışık']],
+  ['Zootopia', ['Zootropolis']],
+  ['Night at the Museum', ['Müzede Bir Gece']],
+  ['Sherlock Holmes: A Game of Shadows', ['Sherlock Holmes Gölge Oyunları']],
+  ['Prince of Persia: The Sands of Time', ['Pers Prensi Zamanın Kumları']],
+  ['I Am Legend', ['Ben Efsaneyim']],
+  ['The Notebook', ['Not Defteri']],
+  ['Troy', ['Truva']],
+  ['300', ['300 Spartalı']],
+  ['Clash of the Titans', ['Titanların Savaşı']],
+  ['Wrath of the Titans', ['Titanların Öfkesi']],
+  ['Kill Bill: Vol. 1', ['Kill Bill Bölüm 1']],
+  ['Kill Bill: Vol. 2', ['Kill Bill Bölüm 2']]
+];
+TR_ALIAS_EK.forEach(function (p) {
+  var k = p[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+  TR_ALIAS[k] = (TR_ALIAS[k] || []).concat(p[1].filter(function (n) { return (TR_ALIAS[k] || []).indexOf(n) === -1; }));
+});
 
 var TMDB_KEY = '000316508321ce461cf81e7c6815eec7';
 var PROVIDER_ID = 'mailru';
@@ -184,7 +340,8 @@ var NOISE = {};
  'hevc', 'aac', 'ac3', 'dts', 'dual', 'tr', 'en', 'eng', 'turkce', 'turkish', 'trdub', 'dublaj', 'dublajli', 'altyazi',
  'altyazili', 'sub', 'subs', 'full', 'hd', 'fhd', 'uhd', 'multi', 'ar', 'arabic', 'arapca', 'imax', 'extended',
  'remastered', 'proper', 'repack', '3dfi', 'yify', 'rarbg', 'mkv', 'mp4', 'avi', 'hdr', 'english', 'ingilizce', 'dub',
- 'subtitle', 'subtitles', 'bluray1080p', 'hd1080p', 'video', 'tek', 'parca', 'part']
+ 'subtitle', 'subtitles', 'bluray1080p', 'hd1080p', 'video', 'tek', 'parca', 'part',
+ 'mpv', 'mkv', 'mov', 'm4v', 'wmv', 'flv', 'bolum']
   .forEach(function (w) { NOISE[w] = 1; });
 
 // Aranan başlıktan anlamlı kelimeler (TMDB tarafı)
@@ -207,7 +364,10 @@ function analyze(title) {
     // "2trdub", "2013tr", "trdub2" gibi rakama yapışık etiketleri ayır
     var m = t.match(/^(\d{1,4})(tr|trdub|trdublaj|dublaj|dual|turkce|altyazi|altyazili)$/) ||
             t.match(/^(tr|trdub|trdublaj|dublaj|dual|turkce)(\d{1,2})$/);
-    if (m) { toks.push(m[1]); toks.push(m[2]); } else toks.push(t);
+    var g = t.match(/^(\d{3,4}p?|tr|dublaj|dublajli|turkce|hd|full|film|tek|parca|bolum)(izle)$/);   // "720pizle", "trizle"
+    if (m) { toks.push(m[1]); toks.push(m[2]); }
+    else if (g) { toks.push(g[1]); toks.push(g[2]); }
+    else toks.push(t);
   });
   var info = { imdb: '', years: [], res: 0, tags: {}, words: [], nums: [], part: 0, bag: toks };
   toks.forEach(function (t) {
@@ -260,11 +420,12 @@ function partialName(info, wants) {
   for (var i = 0; i < wants.length; i++) {
     var ww = sigTokens(wants[i]).words;
     if (!ww.length) continue;
-    var hit = 0, long = false;
+    var hit = 0, long = false, anchor = false;
     ww.forEach(function (w) {
-      if (info.bag.some(function (b) { return looseEq(w, b); })) { hit++; if (w.length >= 5) long = true; }
+      if (info.bag.some(function (b) { return looseEq(w, b); })) { hit++; if (w.length >= 5) long = true; if (w.length >= 8) anchor = true; }
     });
     if (long && hit / ww.length >= 0.5) return true;
+    if (anchor) return true;       // "Terminator" gibi ayırt edici tek kelime (yıl + süre şartıyla)
   }
   return false;
 }
@@ -309,10 +470,13 @@ function langInfo(info) {
   var sub = any(/altyaz|^sub$|^subs$|subtitle/);
   var foreign = any(/^(rus|russian|rusca|ru|ukr|ukrainian|ger|german|deu|fre|french|fra|spa|spanish|ita|italian|hin|hindi|kor|korean|jpn|japanese|chi|chinese|pol|por|arabic|ar|arapca|farsi|persian)$/);
   var en = any(/^en$|^eng$|^english$|ingilizce/);
+  var izle = any(/^izle$/);                       // "izle", "tr izle", "izle.avi", "720pizle" ...
   if (tr && dublaj) return { label: 'TR Dublaj', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
   if (tr && dual) return { label: 'TR Dual', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
   if (tr && sub) return { label: 'TR Altyazı', tier: 5, ok: false, foreign: foreign, sub: true, en: en };
   if (tr) return { label: 'TR', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
+  // "izle" etiketli (Türkçe sitelerin adlandırması) ve yabancı dil / altyazı / EN etiketi yoksa Türkçe say
+  if (izle && !foreign && !sub && !en) return { label: 'TR İzle', tier: 1, ok: true, foreign: foreign, sub: sub, en: en };
   return { label: dual ? 'Dual' : sub ? 'Altyazı' : foreign ? 'Yabancı' : en ? 'EN' : '?', tier: 5, ok: false, foreign: foreign, sub: sub, en: en };
 }
 
@@ -359,9 +523,16 @@ function rankItem(item, ctx) {
     }
   }
 
-  if (loose && (!item.dur || !info.years.length)) return null;         // zayıf eşleşme: yıl ve süre ŞART
+  if (loose) {                                                         // zayıf eşleşme: süre ŞART; yıl yoksa süre ±%3
+    if (!item.dur) return null;
+    if (!info.years.length) {
+      var r0 = ctx.runtime ? Math.abs(item.dur / (ctx.runtime * 60) - 1) : 1;
+      if (r0 > 0.03) return null;
+    }
+  }
   var li = langInfo(info);
   if (/[\u0400-\u04FF]/.test(item.title) && !li.ok) return null;       // Rusça (Kiril) başlık
+  if (!li.ok && ctx.trFilm && !li.foreign) li = { label: 'TR Yerli', tier: 0, ok: true };   // yerli Türk filmi: ses zaten Türkçe
   var maybe = false;
   if (!li.ok) {
     var clean = !li.foreign && !li.sub && !li.en;                        // başka dil / altyazı / EN etiketi yok
@@ -547,26 +718,52 @@ function debugStream(msg) {
 
 function dotted(s) { return String(s || '').replace(/[:\-–—!?,.'"’&]+/g, ' ').trim().replace(/\s+/g, '.'); }
 
+// Film adının yanına eklenen etiketler (öncelik sırasıyla). Sitede elle yazdığın gibi: "Kelebek Etkisi 2 tr izle"
+// Arama kelimelerin HEPSİNİ içeren başlıkları getirir; bu yüzden her etiket ayrı sorgu olur.
+var ETIKET_ILK = ['TR', 'Türkçe Dublaj', 'izle', 'tr izle', 'Türkçe Dublaj izle'];
+var ETIKET_SONRA = ['dublaj', 'TR Dual', 'türkce dublaj izle', 'izle türkce dublaj', 'izle Türkçe Dublaj', 'Türkçe Dublaj tek parça izle',
+  'türkce dublaj tek parca izle', 'tek parça izle', 'tek parca izle', 'türkce dublaj', 'turkce dublaj',
+  'bölüm izle', '1080p izle', '720p izle', '480p izle', '1080pizle', '720pizle', '480pizle', 'tr dublaj izle',
+  'izle.mp4', 'izle.avi', 'izle.mpv', 'TR dub', 'dual tr'];
+
 // Sorgular (öncelik sırasıyla; MAX_SORGU kadarı kullanılır)
+function headOf(s) {                       // "Terminatör 2: Mahşer Günü" -> "Terminatör 2"
+  var h = String(s || '').split(/\s*:\s*|\s+[-–—]\s+/)[0].trim();
+  return h;
+}
+function firstWordOf(s) {                  // ilk anlamlı (5+ harf) kelime: "Terminatör"
+  var w = sigTokens(plain(s)).words.filter(function (x) { return x.length >= 5; })[0];
+  return w || '';
+}
+
 function buildQueries(imdb, year, titles, trTitles) {
   var qs = [], y = year ? ' ' + year : '', dy = year ? '.' + year : '';
   var tr1 = (trTitles || [])[0] || '', tr2 = (trTitles || [])[1] || '';
   var t0 = titles[0] || '', t1 = titles[1] || '', t2 = titles[2] || '';
+  var main = tr1 || t0;                                  // sitede elle aradığın ad (Türkçe varsa o)
+  var names = uniq([tr1, t0].filter(Boolean));
   function add(q) { if (q) qs.push(q); }
   add(imdb);
-  add(tr1 && tr1 + y);
+  add(main);                                             // sadece ad: sitede "Kelebek etkisi" yazınca çıkanların hepsi
+  add(main && main + y);
   add(t0 && t0 + y);
-  add(tr1 && tr1 + ' Türkçe Dublaj');
-  add(t0 && t0 + ' Türkçe Dublaj');
-  add(tr1 && plain(tr1) !== tr1 && plain(tr1) + y);        // "Zor Olum 1988"
+  // Yabancı baş + yıl: sitede "Terminator 2 Kıyamet Günü" gibi karışık yazılanları da getirir
+  var h0 = headOf(t0), hm = headOf(main), f0 = firstWordOf(t0), fm = firstWordOf(main);
+  add(h0 && h0 !== t0 && h0 + y);
+  add(hm && hm !== main && plain(hm) + y);
+  add(f0 && f0 !== h0 && f0 + y);
+  add(fm && fm !== f0 && fm + y);
+  add(h0 && h0 !== t0 && h0 + ' TR');
+  ETIKET_ILK.forEach(function (tag) { names.forEach(function (n) { add(n + ' ' + tag); }); });
   add(imdb && t0 && imdb + '.' + dotted(t0) + dy);
   add(t0 && dotted(t0) + dy);
-  add(tr1 && dotted(plain(tr1)) + dy);                     // "Zor.Olum.1988"
+  add(tr1 && plain(tr1) !== tr1 && plain(tr1) + y);      // "Zor Olum 1988"
+  add(tr1 && dotted(plain(tr1)) + dy);                   // "Zor.Olum.1988"
   add(tr2 && tr2 + y);
   add(t1 && t1 + y);
-  add(t0 && t0 + ' TR Dual');
-  add(tr1);
-  add(tr1 && plain(tr1) !== tr1 && plain(tr1));
+  ETIKET_SONRA.forEach(function (tag) { add(main + ' ' + tag); });
+  if (tr1 && plain(tr1) !== tr1) { add(plain(tr1)); add(plain(tr1) + ' TR'); add(plain(tr1) + ' izle'); }
+  add(t0 && t0 + ' izle');
   add(t2 && t2 + y);
   add(t0);
   return uniq(qs.map(function (q) { return String(q || '').replace(/\s+/g, ' ').trim(); }).filter(function (q) { return q.length >= 3; }))
@@ -575,7 +772,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.3.5'];
+  dbg = ['v1.4.0'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -604,13 +801,17 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
     var wants = uniq(titles.concat(aliasTr).concat(alts.slice(0, 8)));
     var nonTr = [norm(info.original_title), norm(en.title)];
     var trWants = uniq(aliasTr.concat([info.title]).concat(trAlts)).filter(function (t) { return t && nonTr.indexOf(norm(t)) === -1; });
-    var ctx = { imdb: info.imdb_id || '', year: year, runtime: info.runtime || en.runtime || 0, wants: wants, trWants: trWants };
+    var ctx = { imdb: info.imdb_id || '', year: year, runtime: info.runtime || en.runtime || 0, wants: wants, trWants: trWants, trFilm: info.original_language === 'tr' };
     dbg.push('film ' + (info.original_title || info.title) + ' ' + year + ' ' + (ctx.imdb || '-') + ' ' + ctx.runtime + 'dk');
 
     var queries = buildQueries(ctx.imdb, year, titles, trWants);
     var sinks = queries.map(function () { return []; });
-    var jobs = queries.map(function (q, i) { return searchOnce(q, i + 1, i < 4 ? AYAR.MAX_SAYFA : 0, sinks[i]); });
-    return waitSome(jobs, 6, AYAR.ARAMA_SURESI).then(function () {
+    var mainQ = (trWants[0] || titles[0] || '').replace(/\s+/g, ' ').trim();
+    var jobs = queries.map(function (q, i) {
+      var pages = (q === mainQ) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
+      return searchOnce(q, i + 1, pages, sinks[i]);
+    });
+    return waitSome(jobs, Math.min(jobs.length, 14), AYAR.ARAMA_SURESI).then(function () {
       var seen = {}, all = [];
       sinks.forEach(function (l) {
         l.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = true; all.push(it); } });
@@ -677,7 +878,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getStreams: getStreams, _t: { skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries } };
+  module.exports = { getStreams: getStreams, _t: { skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries, ETIKET_ILK: ETIKET_ILK, TR_ALIAS: TR_ALIAS } };
 } else {
   global.getStreams = getStreams;
 }
