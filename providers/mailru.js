@@ -9,13 +9,13 @@ var AYAR = {
   MOBILE: 'https://m.my.mail.ru',
   EKLENTI_ADI: 'mail.ru',
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
-  DEBUG_MODU: false,
+  DEBUG_MODU: true,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 14,   // en fazla kaç arama yapılsın
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
   MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
-  ARAMA_SURESI: 9000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
-  KAYNAK_SURESI: 7000  // ms: kaynak çekme aşaması en geç bu sürede biter
+  ARAMA_SURESI: 5500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
+  KAYNAK_SURESI: 3500  // ms: kaynak çekme aşaması en geç bu sürede biter
 };
 
 // Türkçe adı TMDB'de görünmeyen / farklı yazılan filmler: orijinal ad (harf-rakam, küçük) -> Türkçe adlar
@@ -71,14 +71,14 @@ function pageHeaders(extra) {
 
 // { status, ok, text, cookie }  — cookie: yanıttaki video_key (varsa)
 function getRaw(url, headers, label) {
-  return withTimeout(fetch(url, { headers: headers || pageHeaders() }), 8000).then(function (res) {
+  return withTimeout(fetch(url, { headers: headers || pageHeaders() }), 5000).then(function (res) {
     var cookie = '';
     try {
       var sc = res.headers && res.headers.get && res.headers.get('set-cookie');
       var m = String(sc || '').match(/video_key=([^;,\s]+)/);
       if (m) cookie = m[1];
     } catch (e) {}
-    return withTimeout(res.text(), 8000).then(
+    return withTimeout(res.text(), 5000).then(
       function (t) { return { status: res.status, ok: res.ok, text: t || '', cookie: cookie }; },
       function () { return { status: res.status, ok: false, text: '', cookie: cookie }; }
     );
@@ -554,7 +554,8 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreams(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = [];
+  dbg = ['v1.3.1'];
+  var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
   return Promise.all([
@@ -593,7 +594,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
       sinks.forEach(function (l) {
         l.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = true; all.push(it); } });
       });
-      dbg.push('sonuc ' + all.length);
+      dbg.push('sonuc ' + all.length + ' ' + (Date.now() - T0) + 'ms');
 
       var ranked = [], rejected = 0;
       all.forEach(function (it) {
@@ -625,6 +626,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
             if (!seenUrl[s.url]) { seenUrl[s.url] = true; streams.push(s); }
           });
         });
+        dbg.push('bitti ' + (Date.now() - T0) + 'ms');
         if (!streams.length) return debugStream('kaynak cikmadi');
         return streams;
       });
