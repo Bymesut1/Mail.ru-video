@@ -15,7 +15,7 @@ var AYAR = {
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
   ONEKLER: ['tt.57556'], // yükleyenin dosya adının başına koyduğu işaretler ("işaret + film adı" olarak da aranır)
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
-  MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
+  MAX_BELIRSIZ: 5, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   ARAMA_SURESI: 4500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
   GENEL_SURE: 9000,    // ms: toplam üst sınır
   KAYNAK_SURESI: 3000  // ms: kaynak çekme aşaması en geç bu sürede biter
@@ -275,7 +275,9 @@ var TR_ALIAS_EK = [
   ['Timeline', ['Zaman Yolcusu', 'Zaman Yolcu']],
   ["Snake in the Eagle's Shadow", ['Kartalın Gölgesindeki Yılan']],
   ['Fast Five', ['Hızlı Beş']],
-  ['Aladdin', ['Alaaddin', "Alaaddin'in Sarayı"]]
+  ['Aladdin', ['Alaaddin']],
+  ["A Kid in Aladdin's Palace", ["Alaaddin'in Sarayı", "Alaaddin'in Sarayında Bir Çocuk"]],
+  ['The Tuxedo', ['Smokin']]
 ];
 TR_ALIAS_EK.forEach(function (p) {
   p[0].split('|').forEach(function (nm) {
@@ -580,6 +582,23 @@ function partialName(info, wants) {
   return false;
 }
 
+// Bulanık anahtar kelime: aranan addaki 5+ harfli bir kelime, dosya adındaki bir kelimeye en fazla 2 harf farkla benziyor
+// (Aladdin ~ Alaaddin). Tek başına yetmez; süre birebir (±%1.2) ve yıl uyumu da gerekir.
+function fuzzyHit(info, wants) {
+  var cand = info.bag.filter(function (b) { return b.length >= 5 && !/^\d/.test(b); });
+  for (var i = 0; i < wants.length; i++) {
+    var ww = sigTokens(wants[i]).words.filter(function (w) { return w.length >= 5; });
+    for (var j = 0; j < ww.length; j++) {
+      for (var k = 0; k < cand.length; k++) {
+        var a = ww[j], b = cand[k];
+        if (tokEq(a, b)) return true;
+        if (a.length >= 7 && b.length >= 7 && Math.abs(a.length - b.length) <= 2 && lev(a, b) <= 2) return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Ünsüz iskeleti eşleşmesi (Kptn.Phlps ~ Captain Phillips). Sadece yıl TAM + süre ±%6 ise kabul edilir.
 function skelMatch(info, wants) {
   var js = skel(info.joined || '');
@@ -641,16 +660,16 @@ function rankItem(item, ctx) {
     if (!(nameOk && ctx.year && info.years.indexOf(ctx.year) > -1)) return null;
   }
   var partial = false, skelOk = false;
+  var tight = !!(item.dur && ctx.runtime && Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.012);
   if (!imdbOk && !nameOk) {
     if (partialName(info, ctx.wants)) partial = true;
     else if (skelMatch(info, ctx.wants)) skelOk = true;
+    else if (tight && fuzzyHit(info, ctx.wants)) partial = true;     // süre birebir + en az bir uzun kelime benzer
     else return null;
   }
   var loose = partial || skelOk;   // zayıf ad eşleşmesi: yıl + süre şart
 
-  // Süre neredeyse birebir (±%1.2) ise ad kısmen tutsa / yıl yanlış yazılmış olsa bile aday sayılır
-  // (Alaaddin'in Sarayı 1997 tr -> Aladdin 1992: 1:29:32 ~ 90 dk)
-  var tight = !!(item.dur && ctx.runtime && Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.012);
+  // Süre neredeyse birebir (±%1.2): ad dilden dile farklı yazılsa bile (Aladdin ~ Alaaddin) parmak izi olarak aday sayılır
   var score = 0;
   if (imdbOk) score += 100;
   if (nameOk) score += 20;
@@ -660,14 +679,14 @@ function rankItem(item, ctx) {
   if (info.years.length && ctx.year) {
     var yd = 99;
     info.years.forEach(function (y) { yd = Math.min(yd, Math.abs(y - ctx.year)); });
-    if (loose && yd !== 0 && !(tight && yd <= 8)) return null;
+    if (loose && yd !== 0) return null;
     if (yd === 0) score += 30;
     else if (yd === 1) score += 15;
     else if (!imdbOk) {                                                   // farklı yıl = devam filmi/başka film ...
       // ... ama ad BİREBİR, sıra numarası aynı, süre ±%20 ve yıl en fazla 8 fark ise yükleyen yılı yanlış yazmıştır
       //     (Harbi.Define.2010, Zorro.2.2008)
-      var relax = (nameOk || loose) && yd <= 8 && item.dur && ctx.runtime &&
-                  (tight || (nameOk && Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.2 && exactTitle(info, ctx.wants)));
+      var relax = nameOk && yd <= 8 && item.dur && ctx.runtime &&
+                  Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.2 && exactTitle(info, ctx.wants);
       if (!relax) return null;
       score += 20;
     }
@@ -709,7 +728,7 @@ function rankItem(item, ctx) {
       var rr = (ctx.runtime && item.dur) ? Math.abs(item.dur / (ctx.runtime * 60) - 1) : 1;
       if (!imdbOk && !info.years.length && rr > 0.08) return null;
       li = { label: trChars ? 'TR Yazı' : 'TR Ad', tier: 1, ok: true };
-    } else if (clean && (li.label === '?' || li.label === 'Dual') && (imdbOk || nameOk)) {
+    } else if (clean && (li.label === '?' || li.label === 'Dual') && (imdbOk || nameOk || tight)) {
       maybe = true;                                                      // ses parçası meta bilgisinden doğrulanacak
       li = { label: 'TR Ses', tier: 2, ok: true };
     } else return null;                                                  // EN / RU / AR / altyazılı
@@ -921,6 +940,11 @@ function stripVowels(s, keepLast, joinIt) {
   return out.join(joinIt ? '' : ' ');
 }
 
+// İngilizce kelime -> yükleyenlerin sık kullandığı Türkçe yazım
+var SPELL = { aladdin: 'Alaaddin', tuxedo: 'Smokin', palace: 'Saray', castle: 'Kale', island: 'Ada', ghost: 'Hayalet',
+  dragon: 'Ejderha', pirates: 'Korsanlar', treasure: 'Hazine', mummy: 'Mumya', genie: 'Cin', prince: 'Prens',
+  princess: 'Prenses', kingdom: 'Krallık', jungle: 'Orman', planet: 'Gezegen', mission: 'Görev', secret: 'Sır' };
+
 function buildQueries(imdb, year, titles, trTitles) {
   var qs = [], y = year ? ' ' + year : '', dy = year ? '.' + year : '';
   var tr1 = (trTitles || [])[0] || '', tr2 = (trTitles || [])[1] || '';
@@ -948,6 +972,10 @@ function buildQueries(imdb, year, titles, trTitles) {
   add(stripVowels(main, false, true));
   add(stripVowels(main, true, false));
   (AYAR.ONEKLER || []).forEach(function (o) { add(o + ' ' + main); });
+  // Ad hiç tutmasa bile yıl + Türkçe etiketle gelenler süreyle elenir (Aladdin ~ Alaaddin gibi farklı yazımlar)
+  if (year) ['tr', 'TR dublaj', 'Türkçe Dublaj', 'izle'].forEach(function (t) { add(year + ' ' + t); });
+  sigTokens(plain(t0)).words.filter(function (w) { return w.length >= 5 && SPELL[w]; }).slice(0, 2)
+    .forEach(function (w) { add(SPELL[w] + y); });
   add(imdb && t0 && imdb + '.' + dotted(t0) + dy);
   add(t0 && dotted(t0) + dy);
   add(tr1 && plain(tr1) !== tr1 && plain(tr1) + y);      // "Zor Olum 1988"
@@ -1003,7 +1031,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
     var sinks = queries.map(function () { return []; });
     var mainQ = (trWants[0] || titles[0] || '').replace(/\s+/g, ' ').trim();
     var jobs = queries.map(function (q, i) {
-      var pages = (q === mainQ) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
+      var pages = (q === mainQ || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
       return searchOnce(q, i + 1, pages, sinks[i]);
     });
     return waitSome(jobs, Math.min(jobs.length, 14), AYAR.ARAMA_SURESI).then(function () {
