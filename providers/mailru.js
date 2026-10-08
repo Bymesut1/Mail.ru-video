@@ -459,8 +459,8 @@ function jsonHeaders(pageUrl) {
 function fetchMeta(item) {
   var pageUrl = AYAR.SITE + item.path;
 
-  function fromMeta(url) {
-    return getRaw(url, jsonHeaders(pageUrl), null).then(function (r) {
+  function fromMeta(url, lbl) {
+    return getRaw(url, jsonHeaders(pageUrl), lbl).then(function (r) {
       if (!r.ok || !r.text) return null;
       var data;
       try { data = JSON.parse(r.text); } catch (e) { return null; }
@@ -470,14 +470,18 @@ function fetchMeta(item) {
     });
   }
 
-  var first = item.id ? fromMeta(AYAR.SITE + '/+/video/meta/' + item.id) : Promise.resolve(null);
+  var first = item.id ? fromMeta(AYAR.SITE + '/+/video/meta/' + item.id, 'M' + item.id.slice(-4)) : Promise.resolve(null);
   return first.then(function (m) {
     if (m) return m;
     // yedek: video sayfasından meta adresini / doğrudan <video src> bul
-    return getRaw(pageUrl, null, null).then(function (r) {
+    return getRaw(pageUrl, null, 'PG').then(function (r) {
       var html = r.text || '';
       var mu = (html.match(/data-meta-url="([^"]+)"/) || html.match(/["']metaUrl["']\s*:\s*["']([^"']+)["']/) || [])[1];
-      if (mu) return fromMeta(decodeHtml(mu).replace(/\\\//g, '/'));
+      if (!mu) {
+        var xid = (html.match(/\/\+\/video\/meta\/(?:[a-z0-9]+\/)?(\d{8,})/) || html.match(/["']externalId["']\s*:\s*["']?(\d{8,})/) || [])[1];
+        if (xid) return fromMeta(AYAR.SITE + '/+/video/meta/' + xid, 'MX');
+      }
+      if (mu) return fromMeta(decodeHtml(mu).replace(/\\\//g, '/'), 'MU');
       var vm = html.match(/<video[^>]+\ssrc="((?:https?:)?\/\/[^"]+)"/i);
       if (vm) return { videos: [{ url: decodeHtml(vm[1]), key: '' }], cookie: '', meta: {} };
       return null;
@@ -571,7 +575,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.3.3'];
+  dbg = ['v1.3.4'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -631,8 +635,12 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
       var metaJobs = top.map(function (x, i) {
         return fetchMeta(x.item).then(function (m) { metas[i] = m; }, function () {});
       });
+      var tMeta = Date.now();
       return waitWithin(metaJobs.slice(0, sure.length), AYAR.KAYNAK_SURESI)
-        .then(function () { return waitWithin(metaJobs.slice(sure.length), 700); }).then(function () {
+        .then(function () {
+          var kalan = Math.max(700, AYAR.KAYNAK_SURESI - (Date.now() - tMeta));   // belirsizlere de tam süre
+          return waitWithin(metaJobs.slice(sure.length), kalan);
+        }).then(function () {
         var streams = [], seenUrl = {};
         top.forEach(function (x, i) {
           if (!metas[i]) { dbg.push('meta yok ' + x.item.path); return; }
