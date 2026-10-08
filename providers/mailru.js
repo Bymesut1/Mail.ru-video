@@ -14,7 +14,7 @@ var AYAR = {
   MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
   ONEKLER: ['tt.57556'], // yükleyenin dosya adının başına koyduğu işaretler ("işaret + film adı" olarak da aranır)
-  BELIRSIZ_GOSTER: false, // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
+  BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   ARAMA_SURESI: 4500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
   GENEL_SURE: 9000,    // ms: toplam üst sınır
@@ -274,7 +274,8 @@ var TR_ALIAS_EK = [
   ['Hard Target', ['Zor Hedef']],
   ['Timeline', ['Zaman Yolcusu', 'Zaman Yolcu']],
   ["Snake in the Eagle's Shadow", ['Kartalın Gölgesindeki Yılan']],
-  ['Fast Five', ['Hızlı Beş']]
+  ['Fast Five', ['Hızlı Beş']],
+  ['Aladdin', ['Alaaddin', "Alaaddin'in Sarayı"]]
 ];
 TR_ALIAS_EK.forEach(function (p) {
   p[0].split('|').forEach(function (nm) {
@@ -427,7 +428,7 @@ var NOISE = {};
  'subtitle', 'subtitles', 'bluray1080p', 'hd1080p', 'video', 'tek', 'parca', 'part',
  'mpv', 'mkv', 'mov', 'm4v', 'wmv', 'flv', 'bolum', 'bolumu', 'kisim', 'kismi',
  'xvid', 'divx', 'oped', 'otuk', 'otuke', 'direkizleyin', 'com', 'org', 'net', 'www', 'x26', 'dvd', 'bdrip',
- 'nf', 'amzn', 'dsnp', 'hmax', 'eski', 'yeni', 'seri', 'serisi', 'koleksiyon', 'fullhdfilm', 'hdfilm', 'filmizle', 'izlesene']
+ 'cift', 'nf', 'amzn', 'dsnp', 'hmax', 'eski', 'yeni', 'seri', 'serisi', 'koleksiyon', 'fullhdfilm', 'hdfilm', 'filmizle', 'izlesene']
   .forEach(function (w) { NOISE[w] = 1; });
 
 // Aranan başlıktan anlamlı kelimeler (TMDB tarafı)
@@ -480,6 +481,7 @@ function splitTok(t, depth) {
 function analyze(title) {
   var raw = String(title || '')
     .replace(/\s*[\(\[]\s*\d\s*[\)\]]\s*$/, '')                      // "Film (1)": kopya numarası
+    .replace(/\bsayfa\s*\d+/gi, ' ')                               // "... - Sayfa 3" site sayfası, sıra numarası değil
     .replace(/(^|[^0-9])[257][.,][01](?![0-9])/g, '$1');             // ses düzeni 5.1 / 7.1 / 2.0 sıra numarası sanılmasın
   var toks = [];
   asciiLower(raw).split(/[^a-z0-9]+/).filter(Boolean).forEach(function (t) {
@@ -613,7 +615,7 @@ function langInfo(info) {
   var keys = Object.keys(info.tags).concat(info.bag);
   function any(re) { return keys.some(function (k) { return re.test(k); }); }
   var tr = any(/^tr$|^trk$|turkce|turkish|dublaj|^trdub/);
-  var dual = any(/dual/);
+  var dual = any(/dual|^cift$/);
   var dublaj = any(/dublaj|^trdub/);
   var sub = any(/altyaz|^sub$|^subs$|subtitle/);
   var foreign = any(/^(rus|russian|rusca|ru|ukr|ukrainian|ger|german|deu|fre|french|fra|spa|spanish|ita|italian|hin|hindi|kor|korean|jpn|japanese|chi|chinese|pol|por|arabic|ar|arapca|farsi|persian)$/);
@@ -646,6 +648,9 @@ function rankItem(item, ctx) {
   }
   var loose = partial || skelOk;   // zayıf ad eşleşmesi: yıl + süre şart
 
+  // Süre neredeyse birebir (±%1.2) ise ad kısmen tutsa / yıl yanlış yazılmış olsa bile aday sayılır
+  // (Alaaddin'in Sarayı 1997 tr -> Aladdin 1992: 1:29:32 ~ 90 dk)
+  var tight = !!(item.dur && ctx.runtime && Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.012);
   var score = 0;
   if (imdbOk) score += 100;
   if (nameOk) score += 20;
@@ -655,14 +660,14 @@ function rankItem(item, ctx) {
   if (info.years.length && ctx.year) {
     var yd = 99;
     info.years.forEach(function (y) { yd = Math.min(yd, Math.abs(y - ctx.year)); });
-    if (loose && yd !== 0) return null;
+    if (loose && yd !== 0 && !(tight && yd <= 8)) return null;
     if (yd === 0) score += 30;
     else if (yd === 1) score += 15;
     else if (!imdbOk) {                                                   // farklı yıl = devam filmi/başka film ...
       // ... ama ad BİREBİR, sıra numarası aynı, süre ±%20 ve yıl en fazla 8 fark ise yükleyen yılı yanlış yazmıştır
       //     (Harbi.Define.2010, Zorro.2.2008)
-      var relax = nameOk && yd <= 8 && item.dur && ctx.runtime &&
-                  Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.2 && exactTitle(info, ctx.wants);
+      var relax = (nameOk || loose) && yd <= 8 && item.dur && ctx.runtime &&
+                  (tight || (nameOk && Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.2 && exactTitle(info, ctx.wants)));
       if (!relax) return null;
       score += 20;
     }
