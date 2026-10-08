@@ -17,8 +17,9 @@ var AYAR = {
   // GARANTİ LİSTESİ: sitede olduğunu bildiğin ama bulunamayan filmler. adlar: TMDB'deki herhangi bir ad, yil: TMDB yılı,
   // dosya: sitedeki TAM başlık. Bu filmde önce bu başlık aranır ve bulunursa (yıl/süre/dil bakılmadan) listeye girer.
   MANUEL: [
-    { adlar: ['The Tuxedo', 'Smokin'], yil: 2002, dosya: 'tt.57556.Smokin.tr' },
-    { adlar: ["A Kid in Aladdin's Palace", "Alaaddin'in Sarayı"], yil: 1997, dosya: "Alaaddin'in Sarayı 1997 tr" }
+    { adlar: ['The Tuxedo', 'Smokin'], yil: 2002, dosya: 'tt0290095.The.Tuxedo.2002.TR' },
+    { adlar: ["A Kid in Aladdin's Palace", "Alaaddin'in Sarayı"], yil: 1997, dosya: "tt0127624.A.Kid.in.Aladdin's.Palace.1997.TR" },
+    { adlar: ['First Blood', 'Rambo İlk Kan', 'Rambo'], yil: 1982, dosya: 'tt0083944.Rambo.First.Blood.1982.TR' }
   ],
   // ENGEL LİSTESİ: dosya adı filmle uyuşuyor ama içinde BAŞKA film çıkan yüklemeler. Bu filmde o dosya hiç gösterilmez.
   // (Sildiğin satırdaki dosya tekrar serbest kalır.)
@@ -26,7 +27,7 @@ var AYAR = {
     // örnek: { adlar: ['Film Adı'], yil: 2000, dosya: 'sitedeki.tam.baslik.tr' }
   ],
   // Yükleyen hesabın video listesi (ör. 'https://m.my.mail.ru/mail/KULLANICI/video/'). Doluysa her aramada bu sayfalar da taranır.
-  HESAPLAR: ['https://m.my.mail.ru/mail/muhammedgngr25/video/'],
+  HESAPLAR: ['https://m.my.mail.ru/mail/muhammedgngr25/video/', 'https://m.my.mail.ru/mail/muhammedgngr25/video/_myvideo'],
   HESAP_SAYFA: 12,  // hesap listesi taramasında en fazla kaç sayfa (107 video için fazlasıyla yeter)
   HESAP_ONBELLEK_SN: 600, // taranan hesap listesi kaç saniye hafızada tutulsun
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
@@ -782,7 +783,7 @@ function parseSearch(html) {
   var i, c;
   for (i = 1; i < chunks.length; i++) {
     c = chunks[i];
-    var path = (c.match(/my\.mail\.ru(\/[^"'#\s:?]*?\/video\/[^"'#\s:?]*?\/\d+\.html)/) || [])[1];
+    var path = (c.match(/my\.mail\.ru(\/[^"'#\s:?]*?\/video\/[^"'#\s:?]*?\/\d+\.html)/) || c.match(/href="(\/[^"'#\s:?]*?\/video\/[^"'#\s:?]*?\/\d+\.html)/) || [])[1];
     if (!path) continue;
     out.push({
       path: path,
@@ -832,10 +833,9 @@ function accountsOf(all) {
 // Kullanıcı masaüstü adresi de verebilir (my.mail.ru/mail/KULLANICI/video): mobil adrese çevrilir.
 var HESAP_ONBELLEK = {};
 function hesapUrl(u) {
-  var m = String(u || '').match(/my\.mail\.ru\/(?:mail|list|inbox|bk|corp)\/([^\/?#]+)\/video/i);
+  var m = String(u || '').match(/my\.mail\.ru\/(mail|list|inbox|bk|corp)\/([^\/?#]+)\/video(\/[^?#]*)?/i);
   if (!m) return u;
-  var kok = String(u).match(/my\.mail\.ru\/([a-z]+)\/([^\/?#]+)\/video/i);
-  return AYAR.MOBILE + '/' + kok[1] + '/' + kok[2] + '/video/';
+  return AYAR.MOBILE + '/' + m[1] + '/' + m[2] + '/video' + (m[3] || '/');   // /video/_myvideo gibi alt yol KORUNUR
 }
 // { items: [...] (taranırken doluyor), promise, time } — süre dolsa bile taranan kısım items'ta kalır
 function hesapTara(u) {
@@ -1123,7 +1123,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.7'];
+  dbg = ['v1.5.8'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
