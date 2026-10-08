@@ -9,11 +9,11 @@ var AYAR = {
   MOBILE: 'https://m.my.mail.ru',
   EKLENTI_ADI: 'mail.ru',
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
-  DEBUG_MODU: true,
+  DEBUG_MODU: false,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 14,   // en fazla kaç arama yapılsın
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
-  BELIRSIZ_GOSTER: true, // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
+  BELIRSIZ_GOSTER: false, // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   ARAMA_SURESI: 4500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
   GENEL_SURE: 9000,    // ms: toplam üst sınır
@@ -575,7 +575,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.3.4'];
+  dbg = ['v1.3.5'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
