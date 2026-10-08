@@ -11,8 +11,9 @@ var AYAR = {
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
   DEBUG_MODU: false,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
-  MAX_SORGU: 30,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
+  MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
+  ONEKLER: ['tt.57556'], // yükleyenin dosya adının başına koyduğu işaretler ("işaret + film adı" olarak da aranır)
   BELIRSIZ_GOSTER: false, // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 3, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   ARAMA_SURESI: 4500,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
@@ -192,11 +193,94 @@ var TR_ALIAS_EK = [
   ['Clash of the Titans', ['Titanların Savaşı']],
   ['Wrath of the Titans', ['Titanların Öfkesi']],
   ['Kill Bill: Vol. 1', ['Kill Bill Bölüm 1']],
-  ['Kill Bill: Vol. 2', ['Kill Bill Bölüm 2']]
+  ['Kill Bill: Vol. 2', ['Kill Bill Bölüm 2']],
+  // --- Yüklenen dosya adlarında görülen Türkçe adlar (ekran görüntüleri) ---
+  ['National Treasure', ['Büyük Hazine', 'Büyük Hazine 1']],
+  ['National Treasure: Book of Secrets', ['Büyük Hazine 2', 'Büyük Hazine Sırlar Kitabı']],
+  ['Rush Hour', ['Bitirim İkili', 'Bitirim İkili 1']],
+  ['Rush Hour 2', ['Bitirim İkili 2']],
+  ['Rush Hour 3', ['Bitirim İkili 3']],
+  ['The Mummy Returns', ['Mumya Dönüyor']],
+  ['The Time Machine', ['Zaman Tüneli', 'Zaman Makinesi']],
+  ['Home Alone 3', ['Evde Tek Başına 3']],
+  ['Rambo: First Blood Part II', ['Rambo 2 İlk Kan', 'Rambo İlk Kan 2', 'Rambo 2']],
+  ['Rambo III', ['Rambo 3']],
+  ['Rambo', ['Rambo 4']],
+  ['Rambo: Last Blood', ['Rambo 5', 'Rambo Son Kan']],
+  ['The Transporter|Transporter', ['Taşıyıcı', 'Taşıyıcı 1']],
+  ['Transporter 2', ['Taşıyıcı 2']],
+  ['Transporter 3', ['Taşıyıcı 3']],
+  ['The Transporter Refueled|Transporter Refueled', ['Taşıyıcı Son Hız']],
+  ['District B13|Banlieue 13', ['Banliyö 13']],
+  ['District 13: Ultimatum|Banlieue 13: Ultimatum|Banlieue 13 - Ultimatum', ['Banliyö 13 Ültimatom']],
+  ['Spy Kids', ['Çılgın Çocuklar', 'Çılgın Çocuklar 1']],
+  ['Spy Kids 2: Island of Lost Dreams|Spy Kids 2: The Island of Lost Dreams', ['Çılgın Çocuklar 2']],
+  ['Spy Kids 3-D: Game Over', ['Çılgın Çocuklar 3']],
+  ['The Bourne Identity', ['Geçmişi Olmayan Adam', 'Geçmişi Olmayan Adam 1', 'Bourne Kimliği']],
+  ['The Bourne Supremacy', ['Geçmişi Olmayan Adam 2', 'Bourne Üstünlüğü']],
+  ['The Bourne Ultimatum', ['Geçmişi Olmayan Adam 3', 'Bourne Ültimatom']],
+  ['The Bourne Legacy', ['Geçmişi Olmayan Adam 4', 'Bourne Mirası']],
+  ['Jason Bourne', ['Geçmişi Olmayan Adam 5']],
+  ['Blade', ['Blade 1']],
+  ['Blade II', ['Blade 2']],
+  ['Blade: Trinity', ['Blade 3', 'Blade Trinity']],
+  ['Back to the Future', ['Geleceğe Dönüş', 'Geleceğe Dönüş Bölümü I']],
+  ['Back to the Future Part II', ['Geleceğe Dönüş 2', 'Geleceğe Dönüş Bölümü II']],
+  ['Back to the Future Part III', ['Geleceğe Dönüş 3', 'Geleceğe Dönüş Bölümü III']],
+  ['Ghost Rider', ['Hayalet Sürücü', 'Hayalet Sürücü 1']],
+  ['Ghost Rider: Spirit of Vengeance', ['Hayalet Sürücü 2']],
+  ['The Mask', ['Maske', 'Maske 1']],
+  ['Son of the Mask', ['Maske 2']],
+  ['The Mask of Zorro', ['Maskeli Kahraman Zorro', 'Zorro 1']],
+  ['The Legend of Zorro', ['Zorro 2', 'Maskeli Kahraman Zorro 2', 'Zorro Efsanesi']],
+  ['A Nightmare on Elm Street', ['Elm Sokağında Kabus', 'Elm Sokağında Kabus 1']],
+  ["A Nightmare on Elm Street 2: Freddy's Revenge", ['Elm Sokağında Kabus 2']],
+  ['A Nightmare on Elm Street 3: Dream Warriors', ['Elm Sokağında Kabus 3']],
+  ['A Nightmare on Elm Street 4: The Dream Master', ['Elm Sokağında Kabus 4', 'Elm Sokağında Kabus 4 Rüya Ustası']],
+  ['A Nightmare on Elm Street 5: The Dream Child', ['Elm Sokağında Kabus 5']],
+  ['Army of Darkness', ['Karanlığın Ordusu']],
+  ['The Matrix', ['Matrix', 'Matrix 1']],
+  ['The Matrix Reloaded', ['Matrix 2', 'Matrix Reloaded']],
+  ['The Matrix Revolutions', ['Matrix 3', 'Matrix Revolutions']],
+  ['The Sixth Sense', ['Altıncı His']],
+  ['A.I. Artificial Intelligence', ['Yapay Zeka']],
+  ['Signs', ['İşaretler']],
+  ['The Invasion', ['İstila']],
+  ['Twelve Monkeys|12 Monkeys', ['12 Maymun', 'On İki Maymun']],
+  ['The Thing', ['Şey']],
+  ['Journey to the Center of the Earth', ['Dünyanın Merkezine Yolculuk', 'Dünya Merkezine Yolculuk']],
+  ['The Medallion', ['Madalyon']],
+  ['The Island', ['Ada']],
+  ['Triangle', ['Şeytan Üçgeni']],
+  ['Frequency', ['Frekans']],
+  ['Groundhog Day', ['Bugün Aslında Dündü']],
+  ['Bruce Almighty', ['Aman Tanrım']],
+  ['Evan Almighty', ['Aman Tanrım 2']],
+  ['Small Soldiers', ['Küçük Askerler']],
+  ['Get Smart', ['Akıllı Ol']],
+  ["Baby's Day Out", ['Bebek Firarda']],
+  ['The Invention of Lying', ['Yalanın İcadı']],
+  ['Undisputed II: Last Man Standing', ['Yenilmez 2']],
+  ['Undisputed', ['Yenilmez']],
+  ['Black Lightning', ['Kara Yıldırım']],
+  ['Wrong Turn', ['Bilinmeyen Yol']],
+  ['Scary Movie', ['Korkunç Bir Film', 'Korkunç Bir Film 1']],
+  ['Scary Movie 2', ['Korkunç Bir Film 2']],
+  ['Scary Movie 3', ['Korkunç Bir Film 3']],
+  ['Scary Movie 4', ['Korkunç Bir Film 4']],
+  ['Fantastic Four', ['Fantastik Dörtlü']],
+  ['Fantastic 4: Rise of the Silver Surfer', ['Fantastik Dörtlü Gümüş Sörfçü', 'Fantastik Dörtlü 2']],
+  ['Zathura: A Space Adventure', ['Zathura Bir Uzay Macerası']],
+  ['Hard Target', ['Zor Hedef']],
+  ['Timeline', ['Zaman Yolcusu', 'Zaman Yolcu']],
+  ["Snake in the Eagle's Shadow", ['Kartalın Gölgesindeki Yılan']],
+  ['Fast Five', ['Hızlı Beş']]
 ];
 TR_ALIAS_EK.forEach(function (p) {
-  var k = p[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-  TR_ALIAS[k] = (TR_ALIAS[k] || []).concat(p[1].filter(function (n) { return (TR_ALIAS[k] || []).indexOf(n) === -1; }));
+  p[0].split('|').forEach(function (nm) {
+    var k = nm.toLowerCase().replace(/[^a-z0-9]/g, '');
+    TR_ALIAS[k] = (TR_ALIAS[k] || []).concat(p[1].filter(function (n) { return (TR_ALIAS[k] || []).indexOf(n) === -1; }));
+  });
 });
 
 var TMDB_KEY = '000316508321ce461cf81e7c6815eec7';
@@ -341,7 +425,9 @@ var NOISE = {};
  'altyazili', 'sub', 'subs', 'full', 'hd', 'fhd', 'uhd', 'multi', 'ar', 'arabic', 'arapca', 'imax', 'extended',
  'remastered', 'proper', 'repack', '3dfi', 'yify', 'rarbg', 'mkv', 'mp4', 'avi', 'hdr', 'english', 'ingilizce', 'dub',
  'subtitle', 'subtitles', 'bluray1080p', 'hd1080p', 'video', 'tek', 'parca', 'part',
- 'mpv', 'mkv', 'mov', 'm4v', 'wmv', 'flv', 'bolum']
+ 'mpv', 'mkv', 'mov', 'm4v', 'wmv', 'flv', 'bolum', 'bolumu', 'kisim', 'kismi',
+ 'xvid', 'divx', 'oped', 'otuk', 'otuke', 'direkizleyin', 'com', 'org', 'net', 'www', 'x26', 'dvd', 'bdrip',
+ 'nf', 'amzn', 'dsnp', 'hmax', 'eski', 'yeni', 'seri', 'serisi', 'koleksiyon', 'fullhdfilm', 'hdfilm', 'filmizle', 'izlesene']
   .forEach(function (w) { NOISE[w] = 1; });
 
 // Aranan başlıktan anlamlı kelimeler (TMDB tarafı)
@@ -358,20 +444,51 @@ function sigTokens(s) {
 }
 
 // Yüklenen dosya adı: tt0088763.Back.to.the.Future.Part.I.1985.1080p.TR.dual
+var GLUE_TAGS = ['dublaj', 'izle', 'tr'];
+var NO_DIGIT_SPLIT = /^(part|disc|disk|kisim|bolum|season|sezon|mpeg|divx|xvid|dolby|atmos|hevc|dts|aac|ddp)$/;
+// Dosya adı parçası -> gerçek parçalar. Yükleyenlerin bitişik yazımları:
+//   "Başına2" -> basina 2 | "efsanetr" -> efsane tr | "57556kartalin" -> kartalin | "m1080ptr" -> 1080p tr | "1x" -> 1
+//   "tt.57556" / "tt5967" gibi sahte IMDb numaraları atılır
+function splitTok(t, depth) {
+  var m;
+  depth = depth || 0;
+  if (t === 'tt' || t === 'ttt' || /^ttt?\d{3,5}$/.test(t)) return [];
+  if (/^\d{5,7}$/.test(t)) return [];
+  m = t.match(/^m?(2160|1080|720|480|360)p(tr|dual|dublaj|turkce|izle|hd|sub)?$/);
+  if (m) return m[2] ? [m[1] + 'p', m[2]] : [m[1] + 'p'];
+  m = t.match(/^(\d{1,4})(tr|trdub|trdublaj|dublaj|dual|turkce|altyazi|altyazili)$/) ||
+      t.match(/^(tr|trdub|trdublaj|dublaj|dual|turkce)(\d{1,2})$/) ||
+      t.match(/^(\d{3,4}p?|tr|dublaj|dublajli|turkce|hd|full|film|tek|parca|bolum)(izle)$/);
+  if (m) return [m[1], m[2]];
+  m = t.match(/^(tr|en|eng)(sub|subs|altyazi)$/);                          // "TRSub" = Türkçe ALTYAZI (ses Türkçe değil)
+  if (m) return [m[1], 'sub'];
+  m = t.match(/^(\d{4,7})([a-z]{3,})$/);
+  if (m) return splitTok(m[1], depth + 1).concat(splitTok(m[2], depth + 1));
+  m = t.match(/^(\d{1,2})x$/);
+  if (m) return [m[1]];
+  m = t.match(/^([a-z]{4,})(\d{1,2})$/);
+  if (m && !NO_DIGIT_SPLIT.test(m[1])) return splitTok(m[1], depth + 1).concat([m[2]]);
+  if (depth < 2) {
+    for (var i = 0; i < GLUE_TAGS.length; i++) {
+      var g = GLUE_TAGS[i];
+      if (t.length - g.length >= 4 && t.slice(-g.length) === g) return [t.slice(0, -g.length), g];
+    }
+  }
+  return [t];
+}
+
 function analyze(title) {
+  var raw = String(title || '')
+    .replace(/\s*[\(\[]\s*\d\s*[\)\]]\s*$/, '')                      // "Film (1)": kopya numarası
+    .replace(/(^|[^0-9])[257][.,][01](?![0-9])/g, '$1');             // ses düzeni 5.1 / 7.1 / 2.0 sıra numarası sanılmasın
   var toks = [];
-  asciiLower(title).split(/[^a-z0-9]+/).filter(Boolean).forEach(function (t) {
-    // "2trdub", "2013tr", "trdub2" gibi rakama yapışık etiketleri ayır
-    var m = t.match(/^(\d{1,4})(tr|trdub|trdublaj|dublaj|dual|turkce|altyazi|altyazili)$/) ||
-            t.match(/^(tr|trdub|trdublaj|dublaj|dual|turkce)(\d{1,2})$/);
-    var g = t.match(/^(\d{3,4}p?|tr|dublaj|dublajli|turkce|hd|full|film|tek|parca|bolum)(izle)$/);   // "720pizle", "trizle"
-    if (m) { toks.push(m[1]); toks.push(m[2]); }
-    else if (g) { toks.push(g[1]); toks.push(g[2]); }
-    else toks.push(t);
+  asciiLower(raw).split(/[^a-z0-9]+/).filter(Boolean).forEach(function (t) {
+    splitTok(t).forEach(function (x) { if (x) toks.push(x); });
   });
   var info = { imdb: '', years: [], res: 0, tags: {}, words: [], nums: [], part: 0, bag: toks };
-  toks.forEach(function (t) {
+  toks.forEach(function (t, idx) {
     var m;
+    if (t === 'x' && idx === toks.length - 1) { info.tags[t] = 1; return; }   // kesilmiş "x264" (Roman 10 sanılmasın)
     if (/^tt\d{6,9}$/.test(t)) { info.imdb = t; return; }
     if (/^(19|20)\d{2}$/.test(t)) { info.years.push(parseInt(t, 10)); return; }
     m = t.match(/^(2160|1080|720|480|360)p$/);
@@ -389,15 +506,30 @@ function analyze(title) {
   return info;
 }
 
+// Türkçe ek toleransı: "Bourneun" ~ "Bourne", "Yolcu" ~ "Yolcusu", "Maske" ~ "Mask"
+var TR_SUF = /^(i|u|a|e|s|n|si|su|in|un|an|en|ya|ye|yi|yu|da|de|ta|te|ler|lar|leri|lari|nin|nun|dan|den|tan|ten|nda|nde|ndan|nden|ni|na|ne|ndaki)$/;
+function sufEq(a, b) {
+  var s = a.length <= b.length ? a : b, l = a.length <= b.length ? b : a;
+  return s.length >= 4 && l.length > s.length && l.length - s.length <= 5 && l.indexOf(s) === 0 && TR_SUF.test(l.slice(s.length));
+}
+function tokEq(w, b) { return looseEq(w, b) || sufEq(w, b); }
+
+function noApos(wants) {                   // "Nim's Island" ~ dosyada "Nims.Island"
+  var out = wants.slice();
+  wants.forEach(function (w) { var x = String(w || '').replace(/['’`]/g, ''); if (x !== w) out.push(x); });
+  return out;
+}
+
 function nameMatch(info, wants) {
+  wants = noApos(wants);
   for (var i = 0; i < wants.length; i++) {
     var sw = sigTokens(wants[i]), ww = sw.words;
     if (!ww.length) continue;
     var covered = ww.every(function (w) {
-      return info.bag.some(function (b) { return looseEq(w, b); });
+      return info.bag.some(function (b) { return tokEq(w, b); });
     });
     if (!covered) {
-      // bitişik yazım: "SpiderMan.Homecoming" ~ "Spider-Man: Homecoming"
+      // bitişik yazım: "SpiderMan.Homecoming" ~ "Spider-Man: Homecoming", "YapayZeka" ~ "Yapay Zeka"
       var wn = norm(wants[i]);
       if (wn.length >= 6 && info.joined && info.joined.indexOf(wn) > -1) return true;
       continue;
@@ -408,8 +540,24 @@ function nameMatch(info, wants) {
     if (sw.nums.length && info.nums.length) {
       var common = sw.nums.some(function (n) { return info.nums.indexOf(n) > -1; });
       if (!common) continue;
+    } else if (!sw.nums.length && !info.imdb && info.nums.some(function (n) { return n >= 2 && n <= 20; })) {
+      continue;                     // aranan adda sayı yok ama dosyada "2/3/4.." var: devam filmi (Maske.2, Evde Tek Başına2)
     }
     return true;
+  }
+  return false;
+}
+
+// Birebir ad: dosya adındaki her kelime aranan addan, sıra numaraları da aynı (yıl yanlış yazılmış olsa bile güvenli)
+function exactTitle(info, wants) {
+  wants = noApos(wants);
+  for (var i = 0; i < wants.length; i++) {
+    var sw = sigTokens(wants[i]), ww = sw.words;
+    if (!ww.length) continue;
+    if (!ww.every(function (w) { return info.bag.some(function (b) { return tokEq(w, b); }); })) continue;
+    var extra = info.words.filter(function (b) { return !ww.some(function (w) { return tokEq(w, b); }); });
+    if (extra.length) continue;
+    if (sw.nums.slice().sort().join(',') === info.nums.slice().sort().join(',')) return true;
   }
   return false;
 }
@@ -422,7 +570,7 @@ function partialName(info, wants) {
     if (!ww.length) continue;
     var hit = 0, long = false, anchor = false;
     ww.forEach(function (w) {
-      if (info.bag.some(function (b) { return looseEq(w, b); })) { hit++; if (w.length >= 5) long = true; if (w.length >= 8) anchor = true; }
+      if (info.bag.some(function (b) { return tokEq(w, b); })) { hit++; if (w.length >= 5) long = true; if (w.length >= 8) anchor = true; }
     });
     if (long && hit / ww.length >= 0.5) return true;
     if (anchor) return true;       // "Terminator" gibi ayırt edici tek kelime (yıl + süre şartıyla)
@@ -470,6 +618,8 @@ function langInfo(info) {
   var sub = any(/altyaz|^sub$|^subs$|subtitle/);
   var foreign = any(/^(rus|russian|rusca|ru|ukr|ukrainian|ger|german|deu|fre|french|fra|spa|spanish|ita|italian|hin|hindi|kor|korean|jpn|japanese|chi|chinese|pol|por|arabic|ar|arapca|farsi|persian)$/);
   var en = any(/^en$|^eng$|^english$|ingilizce/);
+  var dubOnly = any(/^dub$/) && !foreign && !en;          // "Dub.Frekans"
+  if (dubOnly) { tr = true; dublaj = true; }
   var izle = any(/^izle$/);                       // "izle", "tr izle", "izle.avi", "720pizle" ...
   if (tr && dublaj) return { label: 'TR Dublaj', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
   if (tr && dual) return { label: 'TR Dual', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
@@ -483,9 +633,11 @@ function langInfo(info) {
 // Puanlama: null = ele, yoksa { score, info }
 function rankItem(item, ctx) {
   var info = analyze(item.title);
-  if (info.imdb && ctx.imdb && info.imdb !== ctx.imdb) return null;       // başka filmin IMDb numarası
   var imdbOk = !!(info.imdb && info.imdb === ctx.imdb);
   var nameOk = nameMatch(info, ctx.wants);
+  if (info.imdb && ctx.imdb && info.imdb !== ctx.imdb) {                   // başka IMDb numarası: ad + yıl TAM tutuyorsa yükleyen numarayı yanlış yazmış olabilir
+    if (!(nameOk && ctx.year && info.years.indexOf(ctx.year) > -1)) return null;
+  }
   var partial = false, skelOk = false;
   if (!imdbOk && !nameOk) {
     if (partialName(info, ctx.wants)) partial = true;
@@ -498,6 +650,7 @@ function rankItem(item, ctx) {
   if (imdbOk) score += 100;
   if (nameOk) score += 20;
   if (loose) score += 10;
+  if (nameOk && !info.years.length && exactTitle(info, ctx.wants)) score += 10;   // yıl yazılmamış ama ad birebir
 
   if (info.years.length && ctx.year) {
     var yd = 99;
@@ -505,7 +658,14 @@ function rankItem(item, ctx) {
     if (loose && yd !== 0) return null;
     if (yd === 0) score += 30;
     else if (yd === 1) score += 15;
-    else if (!imdbOk) return null;                                        // farklı yıl = devam filmi/başka film
+    else if (!imdbOk) {                                                   // farklı yıl = devam filmi/başka film ...
+      // ... ama ad BİREBİR, sıra numarası aynı, süre ±%20 ve yıl en fazla 8 fark ise yükleyen yılı yanlış yazmıştır
+      //     (Harbi.Define.2010, Zorro.2.2008)
+      var relax = nameOk && yd <= 8 && item.dur && ctx.runtime &&
+                  Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.2 && exactTitle(info, ctx.wants);
+      if (!relax) return null;
+      score += 20;
+    }
     else score -= 10;
   }
 
@@ -721,10 +881,11 @@ function dotted(s) { return String(s || '').replace(/[:\-–—!?,.'"’&]+/g, '
 // Film adının yanına eklenen etiketler (öncelik sırasıyla). Sitede elle yazdığın gibi: "Kelebek Etkisi 2 tr izle"
 // Arama kelimelerin HEPSİNİ içeren başlıkları getirir; bu yüzden her etiket ayrı sorgu olur.
 var ETIKET_ILK = ['TR', 'Türkçe Dublaj', 'izle', 'tr izle', 'Türkçe Dublaj izle'];
-var ETIKET_SONRA = ['dublaj', 'TR Dual', 'türkce dublaj izle', 'izle türkce dublaj', 'izle Türkçe Dublaj', 'Türkçe Dublaj tek parça izle',
+var ETIKET_SONRA = ['dublaj', 'TR Dual', 'HD Türkçe', 'turkce', '1080p', '720p', 'BluRay', 'BRRip', 'DVDRip', 'tek',
+  'türkce dublaj izle', 'izle türkce dublaj', 'izle Türkçe Dublaj', 'Türkçe Dublaj tek parça izle',
   'türkce dublaj tek parca izle', 'tek parça izle', 'tek parca izle', 'türkce dublaj', 'turkce dublaj',
   'bölüm izle', '1080p izle', '720p izle', '480p izle', '1080pizle', '720pizle', '480pizle', 'tr dublaj izle',
-  'izle.mp4', 'izle.avi', 'izle.mpv', 'TR dub', 'dual tr'];
+  'izle.mp4', 'izle.avi', 'izle.mpv', 'TR dub', 'dual tr', 'TR-TEK', 'HD'];
 
 // Sorgular (öncelik sırasıyla; MAX_SORGU kadarı kullanılır)
 function headOf(s) {                       // "Terminatör 2: Mahşer Günü" -> "Terminatör 2"
@@ -734,6 +895,25 @@ function headOf(s) {                       // "Terminatör 2: Mahşer Günü" ->
 function firstWordOf(s) {                  // ilk anlamlı (5+ harf) kelime: "Terminatör"
   var w = sigTokens(plain(s)).words.filter(function (x) { return x.length >= 5; })[0];
   return w || '';
+}
+function titleCase(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }
+function wordsOf(s) { return plain(s).replace(/[^A-Za-z0-9\s]+/g, ' ').split(/\s+/).filter(Boolean); }
+// "Yapay Zeka" -> "YapayZeka" (yükleyenler kelimeleri bitişik yazar)
+function glueTitle(s) {
+  var w = wordsOf(s);
+  return w.length >= 2 ? w.map(titleCase).join('') : '';
+}
+// Ünlüsüz yazım: "Altıncı His" -> "AltncHs" ; keepLast: "Banka Soygunu" -> "Bnka Sygnu"
+function stripVowels(s, keepLast, joinIt) {
+  var w = wordsOf(s);
+  if (w.length < 2) return '';
+  var out = w.map(function (x) {
+    if (x.length < 3 || /^\d+$/.test(x)) return x;
+    var last = keepLast && /[aeiou]$/i.test(x) ? x.slice(-1) : '';
+    var body = x.slice(1, x.length - last.length).replace(/[aeiou]/gi, '');
+    return x.charAt(0).toUpperCase() + body.toLowerCase() + last.toLowerCase();
+  });
+  return out.join(joinIt ? '' : ' ');
 }
 
 function buildQueries(imdb, year, titles, trTitles) {
@@ -755,14 +935,24 @@ function buildQueries(imdb, year, titles, trTitles) {
   add(fm && fm !== f0 && fm + y);
   add(h0 && h0 !== t0 && h0 + ' TR');
   ETIKET_ILK.forEach(function (tag) { names.forEach(function (n) { add(n + ' ' + tag); }); });
+  // Yükleyenlerin yazım biçimleri: bitişik (YapayZeka), ünlüsüz (AltncHs / Bnka Sygnu), yükleyen işareti (tt.57556 ...)
+  var gl = glueTitle(main), gl0 = glueTitle(t0);
+  add(gl);
+  add(gl && gl + y);
+  add(gl0 && gl0 !== gl && gl0);
+  add(stripVowels(main, false, true));
+  add(stripVowels(main, true, false));
+  (AYAR.ONEKLER || []).forEach(function (o) { add(o + ' ' + main); });
   add(imdb && t0 && imdb + '.' + dotted(t0) + dy);
   add(t0 && dotted(t0) + dy);
   add(tr1 && plain(tr1) !== tr1 && plain(tr1) + y);      // "Zor Olum 1988"
   add(tr1 && dotted(plain(tr1)) + dy);                   // "Zor.Olum.1988"
   add(tr2 && tr2 + y);
+  add(tr2 && plain(tr2) !== tr2 && plain(tr2) + y);
   add(t1 && t1 + y);
   ETIKET_SONRA.forEach(function (tag) { add(main + ' ' + tag); });
   if (tr1 && plain(tr1) !== tr1) { add(plain(tr1)); add(plain(tr1) + ' TR'); add(plain(tr1) + ' izle'); }
+  (trTitles || []).slice(2, 5).forEach(function (n) { add(n + y); });
   add(t0 && t0 + ' izle');
   add(t2 && t2 + y);
   add(t0);
@@ -772,7 +962,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.4.0'];
+  dbg = ['v1.5.0'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -878,7 +1068,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getStreams: getStreams, _t: { skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries, ETIKET_ILK: ETIKET_ILK, TR_ALIAS: TR_ALIAS } };
+  module.exports = { getStreams: getStreams, _t: { exactTitle: exactTitle, splitTok: splitTok, glueTitle: glueTitle, stripVowels: stripVowels, tokEq: tokEq, skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries, ETIKET_ILK: ETIKET_ILK, TR_ALIAS: TR_ALIAS } };
 } else {
   global.getStreams = getStreams;
 }
