@@ -9,7 +9,7 @@ var AYAR = {
   MOBILE: 'https://m.my.mail.ru',
   EKLENTI_ADI: 'mail.ru',
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
-  DEBUG_MODU: true,
+  DEBUG_MODU: false,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
@@ -889,6 +889,7 @@ function makeStreams(item, ranked, meta) {
     if (meta.cookie && v.url.indexOf('video_key=') === -1) headers['Cookie'] = 'video_key=' + meta.cookie;
     var label = parts.concat([v.key || (ranked.info.res ? ranked.info.res + 'p' : 'Auto')]);
     if (dur) label.push(dur);
+    if (AYAR.DEBUG_MODU) label.push('[' + item.title.slice(0, 60) + ']');      // hangi dosya eşleşti
     return {
       name: AYAR.EKLENTI_ADI,
       title: label.join(' | '),
@@ -1011,7 +1012,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.2'];
+  dbg = ['v1.5.3'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -1116,7 +1117,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
         });
         dbg.push('bitti ' + (Date.now() - T0) + 'ms');
         if (!streams.length) return debugStream('kaynak cikmadi');
-        return streams;
+        return AYAR.DEBUG_MODU ? streams.concat(debugStream('akis bulundu: ' + streams.length)) : streams;   // debug açıkken satırlar akışların altında da görünür
       });
     });
   }).catch(function (e) { return debugStream('hata ' + (e && e.message)); });
