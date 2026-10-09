@@ -11,7 +11,7 @@ var AYAR = {
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
   DEBUG_MODU: false,
   MAX_ADAY: 8,     // en fazla kaç aday video için kaynak çekilsin
-  MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
+  MAX_SORGU: 48,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
   ONEKLER: ['tt.57556'], // yükleyenin dosya adının başına koyduğu işaretler ("işaret + film adı" olarak da aranır)
   // GARANTİ LİSTESİ: sitede olduğunu bildiğin ama bulunamayan filmler. adlar: TMDB'deki herhangi bir ad, yil: TMDB yılı,
@@ -444,8 +444,37 @@ var NOISE = {};
  'subtitle', 'subtitles', 'bluray1080p', 'hd1080p', 'video', 'tek', 'parca', 'part',
  'mpv', 'mkv', 'mov', 'm4v', 'wmv', 'flv', 'bolum', 'bolumu', 'kisim', 'kismi',
  'xvid', 'divx', 'oped', 'otuk', 'otuke', 'direkizleyin', 'com', 'org', 'net', 'www', 'x26', 'dvd', 'bdrip',
- 'cift', 'nf', 'amzn', 'dsnp', 'hmax', 'eski', 'yeni', 'seri', 'serisi', 'koleksiyon', 'fullhdfilm', 'hdfilm', 'filmizle', 'izlesene']
+ 'cift', 'nf', 'amzn', 'dsnp', 'hmax', 'eski', 'yeni', 'seri', 'serisi', 'koleksiyon', 'fullhdfilm', 'hdfilm', 'filmizle', 'izlesene', 'online', 'tam', 'yerli', 'yabanci', 'be', 'tv', 'info', 'biz', 'cc']
   .forEach(function (w) { NOISE[w] = 1; });
+
+// Film adının yanına / başına yazılan TÜRKÇE site ve ifade kelimeleri (Filmsarayi.net, hdfilmcehennemi.com, "Saray bağlan bize izle",
+// "Full izle Online izle", "Yerli Film Full İzle" ...). Ad yabancı olsa bile bunlardan biri varsa Türkçe kabul edilir.
+// Yeni bir ifade görürsen buraya ekle (küçük harf, Türkçe harfler sadeleşmiş: ğ->g ş->s ı->i ö->o ü->u ç->c).
+var TR_SITE_RE = /^(saray|sarayi|sarayim|filmsaray|filmsarayi|filmsarayim|baglan|baglanbize|bize|izle|izleyin|izlesene|filmizle|filmizleyin|hdfilmizle|fullfilmizle|fullhdfilmizle|fullizle|hdizle|izlefilm|bedava|sinema|sinemasi|turkceizle|turkcefilm|hdfilm|fullhdfilm|fullhd|yerli|yerlifilm|yabanci|yabancifilm|ucretsiz|tamfilm|tekparca|tekparcaizle|dublajli|turkcedublaj|turkcedublajli|filmmodu|filmmax|filmbox|filmhane|filmcehennemi|hdfilmcehennemi|filmkutusu|filmdunyasi|politikfilm|filmmakinesi|dizibox|dizipal|yabancidizi)$/;
+function isTrSite(t) {
+  t = String(t || '');
+  return TR_SITE_RE.test(t) || (t.length >= 8 && /(saray|sarayi|filmizle|baglanbize|filmcehennemi|politikfilm|hdfilm|fullfilm|filmmakinesi|filmmodu)/.test(t));
+}
+function hasTrHint(title) {
+  if (hasTrChars(title)) return true;
+  return asciiLower(String(title || '').replace(/_/g, ' ')).split(/[^a-z0-9]+/).some(isTrSite);
+}
+
+// Kısaltılmış (ünlüsüz) yazım: "Krs" ~ "Kurs", "klbn" ~ "kalbin", "drnsi" ~ "derinsi"
+function vowelCount(s) { return (String(s).match(/[aeiou]/g) || []).length; }
+function isSubseq(a, b) {
+  var i = 0;
+  for (var j = 0; j < b.length && i < a.length; j++) if (a.charAt(i) === b.charAt(j)) i++;
+  return i === a.length;
+}
+function abbrEq(tok, w) {
+  if (tok.length < 3 || w.length < 4 || /[\d_]/.test(tok) || tok === w) return false;
+  if (vowelCount(tok) / tok.length > 0.25) return false;          // gerçek kelime değil, kısaltma gibi görünmeli
+  var st = skel(tok), sw = skel(w);
+  if (st.length < 3) return false;
+  if (st === sw) return true;
+  return st.charAt(0) === sw.charAt(0) && isSubseq(st, sw) && st.length / sw.length >= 0.6;
+}
 
 // Aranan başlıktan anlamlı kelimeler (TMDB tarafı)
 function sigTokens(s) {
@@ -477,7 +506,7 @@ function splitTok(t, depth) {
       t.match(/^(tr|trdub|trdublaj|dublaj|dual|turkce)(\d{1,2})$/) ||
       t.match(/^(\d{3,4}p?|tr|dublaj|dublajli|turkce|hd|full|film|tek|parca|bolum)(izle)$/);
   if (m) return [m[1], m[2]];
-  m = t.match(/^(tr|en|eng)(sub|subs|altyazi)$/);                          // "TRSub" = Türkçe ALTYAZI (ses Türkçe değil)
+  m = t.match(/^(tr|en|eng)(sub|subs|alt|altyazi|altyazili)$/);                          // "TRSub" = Türkçe ALTYAZI (ses Türkçe değil)
   if (m) return [m[1], 'sub'];
   m = t.match(/^(\d{4,7})([a-z]{3,})$/);
   if (m) return splitTok(m[1], depth + 1).concat(splitTok(m[2], depth + 1));
@@ -496,6 +525,8 @@ function splitTok(t, depth) {
 
 function analyze(title) {
   var raw = String(title || '')
+    .replace(/_/g, ' ')                                             // "Ben Kimim izle _ hdfilmcehennemi.com _ Film izle": alt çizgi ayraç ('?' joker aşağıda)
+    .replace(/([a-z0-9-]*(?:film|izle|sinema|saray|cehennem|dizi)[a-z0-9-]*)\.(?:com|net|org|be|tv|info|biz|cc|co|ws|me|xyz|club|live|site|online|pw|to|tr)(?![a-z0-9])/gi, '$1 ')   // filmizle.be, PolitikFilm.Org
     .replace(/\s*[\(\[]\s*\d\s*[\)\]]\s*$/, '')                      // "Film (1)": kopya numarası
     .replace(/\bsayfa\s*\d+/gi, ' ')                               // "... - Sayfa 3" site sayfası, sıra numarası değil
     .replace(/(^|[^0-9])[257][.,][01](?![0-9])/g, '$1');             // ses düzeni 5.1 / 7.1 / 2.0 sıra numarası sanılmasın
@@ -503,6 +534,7 @@ function analyze(title) {
   asciiLower(raw.replace(/\?/g, '_')).split(/[^a-z0-9_]+/).filter(Boolean).forEach(function (t) {   // '?' = okunamayan harf (joker)
     splitTok(t).forEach(function (x) { if (x) toks.push(x); });
   });
+  if (toks.indexOf('tr') > -1 || toks.indexOf('trk') > -1) toks = toks.map(function (x) { return x === 'alt' ? 'sub' : x; });   // "TR.ALT" / "TR Alt" = Türkçe altyazı
   var info = { imdb: '', years: [], res: 0, tags: {}, words: [], nums: [], part: 0, bag: toks };
   toks.forEach(function (t, idx) {
     var m;
@@ -514,7 +546,7 @@ function analyze(title) {
     if (t === '4k') { info.res = Math.max(info.res, 2160); return; }
     m = t.match(/^(?:cd|disc|disk|pt|part|kisim)(\d)$/);
     if (m) { info.part = parseInt(m[1], 10); return; }
-    if (NOISE[t] || /dublaj|turkce|altyaz|dual/.test(t)) { info.tags[t] = 1; return; }
+    if (NOISE[t] || isTrSite(t) || /dublaj|turkce|altyaz|dual/.test(t)) { info.tags[t] = 1; return; }
     if (/^\d{1,2}$/.test(t)) { info.nums.push(parseInt(t, 10)); return; }
     if (ROMAN[t]) { info.nums.push(ROMAN[t]); return; }
     if (STOP_WORDS[t]) return;
@@ -634,6 +666,25 @@ function skelMatch(info, wants) {
   return false;
 }
 
+// Kısaltmalı ad eşleşmesi (klbn.drnsi ~ Kalbin Derinsi, Krs ~ Kurs): her aranan kelime ya normal ya da kısaltma olarak dosyada geçmeli.
+// Zayıf eşleşme sayılır: yıl TAM + süre ±%6 şart (rankItem'da).
+function abbrMatch(info, wants) {
+  for (var i = 0; i < wants.length; i++) {
+    var sw = sigTokens(wants[i]), ww = sw.words, abbr = 0;
+    if (!ww.length) continue;
+    var all = ww.every(function (w) {
+      if (info.bag.some(function (b) { return tokEq(w, b); })) return true;
+      if (info.words.some(function (b) { return abbrEq(b, w); })) { abbr++; return true; }
+      return false;
+    });
+    if (!all || !abbr) continue;
+    if (sw.nums.length && info.nums.length) { if (!sw.nums.some(function (n) { return info.nums.indexOf(n) > -1; })) continue; }
+    else if (!sw.nums.length && info.nums.some(function (n) { return n >= 2 && n <= 20; })) continue;
+    return true;
+  }
+  return false;
+}
+
 // Ses parçası bilgisinde Türkçe geçiyor mu (mail.ru meta JSON'unda ses/dil alanları)
 function metaTurkishAudio(m) {
   var found = false, KEY = /audio|track|dub|voice|sound|language/i, VAL = /^(tr|tur|trk|turkish|turkce|türkçe)$/i;
@@ -665,12 +716,16 @@ function langInfo(info) {
   var dubOnly = any(/^dub$/) && !foreign && !en;          // "Dub.Frekans"
   if (dubOnly) { tr = true; dublaj = true; }
   var izle = any(/^izle$/);                       // "izle", "tr izle", "izle.avi", "720pizle" ...
+  var site = keys.some(isTrSite);                 // Filmsarayi, hdfilmcehennemi, Bağlan Bize, Full izle, Yerli Film ... (Türkçe ifadeler)
+  var altTr = any(/altyaz/);                      // "Altyazılı" (Türkçe sözcük)
   if (tr && dublaj) return { label: 'TR Dublaj', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
   if (tr && dual) return { label: 'TR Dual', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
-  if (tr && sub) return { label: 'TR Altyazı', tier: 5, ok: false, foreign: foreign, sub: true, en: en };
+  if (tr && sub) return { label: 'TR Altyazı', tier: 3, ok: true, foreign: foreign, sub: true, en: en };   // TR.SUB / TR.ALT / TRSub / TR Altyazılı: Türkçe altyazılı sürümler de eklenir
   if (tr) return { label: 'TR', tier: 0, ok: true, foreign: foreign, sub: sub, en: en };
   // "izle" etiketli (Türkçe sitelerin adlandırması) ve yabancı dil / altyazı / EN etiketi yoksa Türkçe say
-  if (izle && !foreign && !sub && !en) return { label: 'TR İzle', tier: 1, ok: true, foreign: foreign, sub: sub, en: en };
+  if ((izle || site) && !foreign && !sub && !en) return { label: izle ? 'TR İzle' : 'TR Site', tier: 1, ok: true, foreign: foreign, sub: sub, en: en };
+  // Türkçe site / Türkçe "altyazılı" sözcüğü + altyazı: Türkçe altyazılı say (ses orijinal)
+  if (sub && (izle || site || altTr) && !foreign && !en) return { label: 'TR Altyazı', tier: 3, ok: true, foreign: foreign, sub: true, en: en };
   return { label: dual ? 'Dual' : sub ? 'Altyazı' : foreign ? 'Yabancı' : en ? 'EN' : '?', tier: 5, ok: false, foreign: foreign, sub: sub, en: en };
 }
 
@@ -690,7 +745,7 @@ function rankItem(item, ctx) {
   var tight = !!(item.dur && ctx.runtime && Math.abs(item.dur / (ctx.runtime * 60) - 1) <= 0.012);
   if (!imdbOk && !nameOk) {
     if (partialName(info, ctx.wants)) partial = true;
-    else if (skelMatch(info, ctx.wants)) skelOk = true;
+    else if (skelMatch(info, ctx.wants) || abbrMatch(info, ctx.wants)) skelOk = true;
     else if (tight && fuzzyHit(info, ctx.wants)) partial = true;     // süre birebir + en az bir uzun kelime benzer
     else return null;
   }
@@ -748,7 +803,7 @@ function rankItem(item, ctx) {
   if (!li.ok) {
     var clean = !li.foreign && !li.sub && !li.en;                        // başka dil / altyazı / EN etiketi yok
     var trNameOk = !!(ctx.trWants && ctx.trWants.length && nameMatch(info, ctx.trWants));
-    var trChars = hasTrChars(item.title);
+    var trChars = hasTrHint(item.title);
     if (clean && li.label === '?' && (trNameOk || trChars)) {
       // Etiket yok ama Türkçe adla ya da Türkçe harflerle yazılmış: Türkçe say
       // (yıl yoksa süre ±%8 içinde olmalı; başka filmle karışmasın)
@@ -957,8 +1012,12 @@ function dotted(s) { return String(s || '').replace(/[:\-–—!?,.'"’&]+/g, '
 
 // Film adının yanına eklenen etiketler (öncelik sırasıyla). Sitede elle yazdığın gibi: "Kelebek Etkisi 2 tr izle"
 // Arama kelimelerin HEPSİNİ içeren başlıkları getirir; bu yüzden her etiket ayrı sorgu olur.
+// Sitede film adının yanına elle yazılan Türkçe ifadeler (ör. "Terminator Saray", "Terminator bağlan bize", "Terminator film izle")
+var ETIKET_SITE = ['Filmsarayi', 'saray', 'Bağlan Bize', 'film izle'];
 var ETIKET_ILK = ['TR', 'Türkçe Dublaj', 'izle', 'tr izle', 'Türkçe Dublaj izle'];
-var ETIKET_SONRA = ['dublaj', 'TR Dual', 'HD Türkçe', 'turkce', '1080p', '720p', 'BluRay', 'BRRip', 'DVDRip', 'tek',
+var ETIKET_SONRA = ['Altyazılı', 'TR Altyazılı', 'TR Sub', 'TR Alt', 'TRSub', 'TRDUB', 'DVDRip TRDUB', 'Full izle', 'Online izle', 'HD izle',
+  'Film izle HD', 'Tam Filmi izle', 'Yerli Film Full İzle', 'Türkçe dublaj izle', 'hdfilmcehennemi', 'filmizle', 'Full izle Online izle Film izle HD izle Türkçe dublaj izle',
+  '1080p Altyazılı film izle', 'PolitikFilm.Org', 'dublaj', 'TR Dual', 'HD Türkçe', 'turkce', '1080p', '720p', 'BluRay', 'BRRip', 'DVDRip', 'tek',
   'türkce dublaj izle', 'izle türkce dublaj', 'izle Türkçe Dublaj', 'Türkçe Dublaj tek parça izle',
   'türkce dublaj tek parca izle', 'tek parça izle', 'tek parca izle', 'türkce dublaj', 'turkce dublaj',
   'bölüm izle', '1080p izle', '720p izle', '480p izle', '1080pizle', '720pizle', '480pizle', 'tr dublaj izle',
@@ -973,6 +1032,7 @@ function firstWordOf(s) {                  // ilk anlamlı (5+ harf) kelime: "Te
   var w = sigTokens(plain(s)).words.filter(function (x) { return x.length >= 5; })[0];
   return w || '';
 }
+function noArticle(s) { return String(s || '').replace(/^(the|a|an)\s+/i, '').trim(); }
 function titleCase(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }
 function wordsOf(s) { return plain(s).replace(/[^A-Za-z0-9\s]+/g, ' ').split(/\s+/).filter(Boolean); }
 // "Yapay Zeka" -> "YapayZeka" (yükleyenler kelimeleri bitişik yazar)
@@ -983,7 +1043,8 @@ function glueTitle(s) {
 // Ünlüsüz yazım: "Altıncı His" -> "AltncHs" ; keepLast: "Banka Soygunu" -> "Bnka Sygnu"
 function stripVowels(s, keepLast, joinIt) {
   var w = wordsOf(s);
-  if (w.length < 2) return '';
+  if (w.length < 1) return '';
+  if (w.length === 1 && (w[0].length < 4 || /^\d+$/.test(w[0]))) return '';      // tek kelimelik ad: "Kurs" -> "Krs"
   var out = w.map(function (x) {
     if (x.length < 3 || /^\d+$/.test(x)) return x;
     var last = keepLast && /[aeiou]$/i.test(x) ? x.slice(-1) : '';
@@ -1016,6 +1077,9 @@ function buildQueries(imdb, year, titles, trTitles) {
   add(f0 && f0 !== h0 && f0 + y);
   add(fm && fm !== f0 && fm + y);
   add(h0 && h0 !== t0 && h0 + ' TR');
+  // Ad + Türkçe site ifadesi (yıl yazmadan)
+  var siteNames = uniq([noArticle(t0), tr1, plain(tr1)].filter(Boolean)).slice(0, 2);
+  ETIKET_SITE.forEach(function (tag) { siteNames.forEach(function (n) { add(n + ' ' + tag); }); });
   ETIKET_ILK.forEach(function (tag) { names.forEach(function (n) { add(n + ' ' + tag); }); });
   // Yükleyenlerin yazım biçimleri: bitişik (YapayZeka), ünlüsüz (AltncHs / Bnka Sygnu), yükleyen işareti (tt.57556 ...)
   var noApos = main.replace(/['’`]/g, ' ').replace(/\s+/g, ' ').trim();                    // "Alaaddin'in Sarayı" -> "Alaaddin in Sarayı"
@@ -1028,9 +1092,14 @@ function buildQueries(imdb, year, titles, trTitles) {
   add(gl0 && gl0 !== gl && gl0);
   add(stripVowels(main, false, true));
   add(stripVowels(main, true, false));
+  // Kısaltmalı yazımlar yılla birlikte: "Krs 2014", "Klbn Drnsi 2014", "Krs.2014"
+  [main, t0].forEach(function (nm) {
+    var a1 = stripVowels(nm, false, false), a2 = stripVowels(nm, true, false);
+    [a1, a2].forEach(function (a) { if (a && norm(a) !== norm(nm)) { add(a + y); add(a && dotted(a) + dy); } });
+  });
   (AYAR.ONEKLER || []).forEach(function (o) { add(o + ' ' + main); });
   // Ad hiç tutmasa bile yıl + Türkçe etiketle gelenler süreyle elenir (Aladdin ~ Alaaddin gibi farklı yazımlar)
-  if (year) ['tr', 'TR dublaj', 'Türkçe Dublaj', 'izle'].forEach(function (t) { add(year + ' ' + t); });
+  if (year) ['tr', 'TR dublaj', 'Türkçe Dublaj', 'izle', 'TRDUB', 'filmizle', 'Altyazılı', 'TR Sub'].forEach(function (t) { add(year + ' ' + t); });
   sigTokens(plain(t0)).words.filter(function (w) { return w.length >= 5 && SPELL[w]; }).slice(0, 2)
     .forEach(function (w) { add(SPELL[w] + y); });
   add(imdb && t0 && imdb + '.' + dotted(t0) + dy);
@@ -1052,7 +1121,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.6'];
+  dbg = ['v1.5.7'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
@@ -1118,7 +1187,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode) {
         return items.length ? morePages(r.text, items, AYAR.HESAP_SAYFA, 'H' + hi, hs) : items;
       }));
     });
-    return waitSome(jobs, Math.min(jobs.length, 14), AYAR.ARAMA_SURESI).then(function () {
+    return waitSome(jobs, Math.min(jobs.length, Math.max(14, Math.ceil(jobs.length * 0.7))), AYAR.ARAMA_SURESI).then(function () {
       var seen = {}, all = [];
       sinks.forEach(function (l) {
         l.forEach(function (it) { if (!seen[it.path]) { seen[it.path] = true; all.push(it); } });
@@ -1211,7 +1280,7 @@ function getStreams(tmdbId, mediaType, season, episode) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getStreams: getStreams, _t: { sameTitle: sameTitle, wildEq: wildEq, accountsOf: accountsOf, exactTitle: exactTitle, splitTok: splitTok, glueTitle: glueTitle, stripVowels: stripVowels, tokEq: tokEq, skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries, ETIKET_ILK: ETIKET_ILK, TR_ALIAS: TR_ALIAS } };
+  module.exports = { getStreams: getStreams, _t: { isTrSite: isTrSite, hasTrHint: hasTrHint, abbrMatch: abbrMatch, abbrEq: abbrEq, sameTitle: sameTitle, wildEq: wildEq, accountsOf: accountsOf, exactTitle: exactTitle, splitTok: splitTok, glueTitle: glueTitle, stripVowels: stripVowels, tokEq: tokEq, skelMatch: skelMatch, metaTurkishAudio: metaTurkishAudio, aliasNames: aliasNames, langInfo: langInfo, partialName: partialName, parseSearch: parseSearch, analyze: analyze, rankItem: rankItem, nameMatch: nameMatch, sigTokens: sigTokens, looseEq: looseEq, buildQueries: buildQueries, ETIKET_ILK: ETIKET_ILK, TR_ALIAS: TR_ALIAS } };
 } else {
   global.getStreams = getStreams;
 }
