@@ -5,7 +5,7 @@
     {
       "id": "mailru",
       "name": "mailru",
-      "description": "my.mail.ru kullanıcı yüklemeleri (Türkçe sesli / Türkçe adlı / Türkçe altyazılı filmler)",
+      "description": "my.mail.ru kullanıcı yüklemeleri (Türkçe sesli / Türkçe adlı filmler)",
       "version": "1.5.7",
       "author": "custom",
       "supportedTypes": [
