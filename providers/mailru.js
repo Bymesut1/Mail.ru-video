@@ -1,5 +1,5 @@
 // ============================================================
-//  mailru v1.6.0 — Nuvio scraper (my.mail.ru/video, kullanıcı yüklemeleri)
+//  mailru v1.7.0 — Nuvio scraper (my.mail.ru/video, kullanıcı yüklemeleri)
 //  Akış: TMDB bilgisi -> mail.ru araması -> aday eleme/puanlama
 //        -> video meta JSON -> mp4 linkleri
 // ============================================================
@@ -109,7 +109,11 @@ var AYAR = {
   PARALEL: 8,          // aynı anda en fazla kaç arama/sayfa isteği (kaynak/meta istekleri bu sınıra takılmaz, öncelikli)
   MOTOR_ADAY: 14,      // arama motorundan gelen en fazla kaç adresin meta bilgisi doğrulansın
   HESAP_OGREN: true,   // arama motorunda bulunan yeni yükleyen hesaplar da taransın ve sonraki aramalar için hatırlansın
-  SURUM: '1.6.0'
+  RETRY: true,         // zaman aşımı / 429 / 202 / 5xx gelen isteği (arama motorları hariç) bir kez daha dene
+  RETRY_MAX: 12,       // bir film aramasında toplam en fazla kaç yeniden deneme (telefonu/ağı boğmasın)
+  RETRY_BEKLE: 700,    // ms: yeniden denemeden önce bekleme (429 gelirse 1500ms, Retry-After varsa o, en fazla 2500ms)
+  RETRY_SON: 14000,    // ms: aramanın bu süresinden sonra yeni deneme başlatılmaz (GENEL_SURE'ye takılmamak için)
+  SURUM: '1.7.0'
 };
 
 // Türkçe adı TMDB'de görünmeyen / farklı yazılan filmler: orijinal ad (harf-rakam, küçük) -> Türkçe adlar
@@ -427,22 +431,48 @@ function getRaw(url, headers, label, prio) {
   }
   return getRawNow(url, headers, label);
 }
-function getRawNow(url, headers, label) {
+var RT = { n: 0, ok: 0, t0: 0 };   // yeniden deneme sayacı (her film aramasında sıfırlanır)
+function delay(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+function rawOnce(url, headers) {
   return withTimeout(fetch(url, { headers: headers || pageHeaders() }), 5000).then(function (res) {
-    var cookie = '';
+    var cookie = '', ra = 0;
     try {
       var sc = res.headers && res.headers.get && res.headers.get('set-cookie');
       var m = String(sc || '').match(/video_key=([^;,\s]+)/);
       if (m) cookie = m[1];
+      ra = parseInt(res.headers && res.headers.get && res.headers.get('retry-after'), 10) || 0;
     } catch (e) {}
     return withTimeout(res.text(), 5000).then(
-      function (t) { return { status: res.status, ok: res.ok, text: t || '', cookie: cookie }; },
-      function () { return { status: res.status, ok: false, text: '', cookie: cookie }; }
+      function (t) { return { status: res.status, ok: res.ok, text: t || '', cookie: cookie, ra: ra }; },
+      function () { return { status: res.status, ok: false, text: '', cookie: cookie, ra: ra }; }
     );
   }).catch(function (e) {
-    return { status: 0, ok: false, text: '', cookie: '', err: (e && e.message) || 'hata' };
+    return { status: 0, ok: false, text: '', cookie: '', err: (e && e.message) || 'hata', ra: 0 };
+  });
+}
+
+// Geçici hata mı? zaman aşımı/bağlantı hatası (0), 429, 202 (kabul edildi ama içerik yok), 5xx, boş 200 yanıt
+function geciciHata(r) {
+  return r.status === 0 || r.status === 429 || r.status === 202 || r.status >= 500 || (r.status === 200 && !r.text);
+}
+function yenidenDenenir(r, label) {
+  return AYAR.RETRY && geciciHata(r) && !/^E/.test(label || '') &&      // arama motorları (E...) denenmez: 429'u kalıcıdır, süre yakar
+    RT.n < (AYAR.RETRY_MAX || 0) && (Date.now() - RT.t0) < (AYAR.RETRY_SON || 14000);
+}
+
+function getRawNow(url, headers, label) {
+  return rawOnce(url, headers).then(function (r) {
+    if (!yenidenDenenir(r, label)) return r;
+    RT.n++;
+    var bekle = Math.min(2500, Math.max(r.status === 429 ? 1500 : (AYAR.RETRY_BEKLE || 700), (r.ra || 0) * 1000));
+    return delay(bekle).then(function () { return rawOnce(url, headers); }).then(function (r2) {
+      r2.retried = true;
+      if (r2.ok && r2.text) RT.ok++;
+      return r2;
+    });
   }).then(function (r) {
-    if (label) dbg.push(label + ' ' + (r.status || r.err || '?') + '/' + r.text.length);
+    if (label) dbg.push(label + ' ' + (r.status || r.err || '?') + '/' + r.text.length + (r.retried ? ' r' : ''));
     return r;
   });
 }
@@ -1263,6 +1293,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
   if (mediaType !== 'movie') return Promise.resolve([]);
   dbg = ['v' + AYAR.SURUM];
   var T0 = Date.now();
+  RT.n = 0; RT.ok = 0; RT.t0 = T0;
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
   return Promise.all([
@@ -1331,7 +1362,11 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
     var metaCache = {};
     function metaOf(it) {
       if (it.metaHazir) return Promise.resolve(it.metaHazir);
-      if (!metaCache[it.path]) metaCache[it.path] = fetchMeta(it).then(function (m) { return m; }, function () { return null; });
+      if (!metaCache[it.path]) metaCache[it.path] = fetchMeta(it).then(function (m) { return m; }, function () { return null; }).then(function (m) {
+        if (m || !AYAR.RETRY || (Date.now() - T0) > (AYAR.RETRY_SON || 14000)) return m;
+        RT.n++;                                                         // kaynak bilgisi hiç gelmediyse: kısa bekle, baştan bir kez daha
+        return delay(AYAR.RETRY_BEKLE || 700).then(function () { return fetchMeta(it); }).then(function (m2) { if (m2) RT.ok++; return m2; }, function () { return null; });
+      });
       return metaCache[it.path];
     }
     function sureOf(list) { return list.filter(function (x) { return !x.r.maybe; }); }
@@ -1397,6 +1432,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
     return waitWithin(jobs, haveFast ? AYAR.HIZLI_PENCERE : AYAR.ARAMA_SURESI).then(function () {
       sinks.forEach(function (l) { l.forEach(addItem); });
       dbg.push('sonuc ' + all.length + ' ' + (Date.now() - T0) + 'ms');
+      dbg.push('retry ' + RT.n + '/' + RT.ok);
       if (AYAR.DEBUG_MODU) {
         dbg.push('sorgu sayilari ' + sinks.slice(0, queries.length).map(function (l) { return l.length; }).join(','));
         queries.slice(0, 10).forEach(function (q, i) { dbg.push('q' + (i + 1) + ' [' + sinks[i].length + '] ' + q); });
@@ -1448,6 +1484,15 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
       return scanP.then(function () {
         if (accs.length) { rankAll(); dbg.push('hesap sonrasi aday ' + ranked.length); }
         return motorDogrula(sureOf(ranked).length >= 1 ? 3500 : 7000);
+      }).then(function () {
+        if (ranked.length || !AYAR.RETRY || (Date.now() - T0) > (AYAR.RETRY_SON || 14000)) return;
+        dbg.push('ikinci tur');                                         // hiç aday yok: ilk 3 site aramasını bir kez daha yap
+        var s2 = [];
+        var j2 = queries.slice(0, 3).map(function (q, qi) { return searchOnce(q, 'R' + (qi + 1), 0, s2).catch(function () {}); });
+        return waitWithin(j2, 4500).then(function () {
+          s2.forEach(addItem); rankAll();
+          dbg.push('ikinci tur aday ' + ranked.length);
+        });
       }).then(function () {
         if (!ranked.length) return debugStream('uygun video yok: ' + (info.title || info.original_title) + ' ' + year);
 
