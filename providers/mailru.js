@@ -10,7 +10,7 @@ var AYAR = {
   EKLENTI_ADI: 'mail.ru',
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
   DEBUG_MODU: false,
-  MIN_SURE: 300,   // sn: bundan kısa videolar (fragman/kesit) hariç; süre uyumu ARANMAZ. 0 yaparsan hiç eleme olmaz
+  MIN_SURE: 1200,   // sn: bundan kısa videolar (fragman/kesit/çizgi film klibi) hariç; süre uyumu ARANMAZ. 0 yaparsan hiç eleme olmaz
   MAX_ADAY: 20,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 36,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
   MAX_SAYFA: 1,    // çok sonuç dönen aramalarda en fazla kaç ek sayfa okunsun
@@ -92,7 +92,7 @@ var AYAR = {
   ],
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 12, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
-  MOTOR_SORGU: 8,   // arama motorlarına en fazla kaç sorgu gitsin; MOTOR_SURE: bu aşamanın üst sınırı (ms)
+  MOTOR_SORGU: 10,   // arama motorlarına en fazla kaç sorgu gitsin; MOTOR_SURE: bu aşamanın üst sınırı (ms)
   MOTOR_SURE: 11000,
   ARAMA_MOTORU: true,
   ARAMA_SURESI: 12000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
@@ -356,7 +356,93 @@ var TR_ALIAS_EK = [
   ['Fast Five', ['Hızlı Beş']],
   ['Aladdin', ['Alaaddin']],
   ["A Kid in Aladdin's Palace", ["Alaaddin'in Sarayı", "Alaaddin'in Sarayında Bir Çocuk"]],
-  ['The Tuxedo', ['Smokin']]
+  ['The Tuxedo', ['Smokin']],
+  ['Hulk', ['Yeşil Dev', 'Yeşil Dev Hulk', 'Hulk Yeşil Dev']],
+  ['The Incredible Hulk|Incredible Hulk', ['İnanılmaz Hulk', 'Yeşil Dev', 'Yeşil Dev Hulk']],
+  ['Batman Begins', ['Batman Başlıyor']],
+  ['The Dark Knight', ['Kara Şövalye']],
+  ['The Dark Knight Rises', ['Kara Şövalye Yükseliyor']],
+  ['Iron Man', ['Demir Adam']],
+  ['Iron Man 2', ['Demir Adam 2']],
+  ['Iron Man 3', ['Demir Adam 3']],
+  ['The Avengers|Marvel\'s The Avengers', ['Yenilmezler', 'Avengers Yenilmezler']],
+  ['Avengers: Age of Ultron', ['Yenilmezler: Ultron Çağı', 'Yenilmezler 2']],
+  ['Avengers: Infinity War', ['Yenilmezler: Sonsuzluk Savaşı', 'Yenilmezler 3']],
+  ['Avengers: Endgame', ['Yenilmezler: Son Oyun', 'Yenilmezler 4']],
+  ['Captain America: The First Avenger', ['Kaptan Amerika: İlk Yenilmez']],
+  ['Captain America: The Winter Soldier', ['Kaptan Amerika: Kış Askeri']],
+  ['Captain America: Civil War', ['Kaptan Amerika: Kahramanların Savaşı']],
+  ['Guardians of the Galaxy', ['Galaksi Koruyucuları']],
+  ['Harry Potter and the Philosopher\'s Stone|Harry Potter and the Sorcerer\'s Stone', ['Harry Potter ve Felsefe Taşı']],
+  ['Harry Potter and the Chamber of Secrets', ['Harry Potter ve Sırlar Odası']],
+  ['Harry Potter and the Prisoner of Azkaban', ['Harry Potter ve Azkaban Tutsağı']],
+  ['Harry Potter and the Goblet of Fire', ['Harry Potter ve Ateş Kadehi']],
+  ['Harry Potter and the Order of the Phoenix', ['Harry Potter ve Zümrüdüanka Yoldaşlığı']],
+  ['Harry Potter and the Half-Blood Prince', ['Harry Potter ve Melez Prens']],
+  ['Harry Potter and the Deathly Hallows: Part 1', ['Harry Potter ve Ölüm Yadigarları: Bölüm 1']],
+  ['Harry Potter and the Deathly Hallows: Part 2', ['Harry Potter ve Ölüm Yadigarları: Bölüm 2']],
+  ['The Lord of the Rings: The Fellowship of the Ring', ['Yüzüklerin Efendisi: Yüzük Kardeşliği']],
+  ['The Lord of the Rings: The Two Towers', ['Yüzüklerin Efendisi: İki Kule']],
+  ['The Lord of the Rings: The Return of the King', ['Yüzüklerin Efendisi: Kralın Dönüşü']],
+  ['The Hobbit: An Unexpected Journey', ['Hobbit: Beklenmedik Yolculuk']],
+  ['The Hobbit: The Desolation of Smaug', ['Hobbit: Smaug\'un Çorak Toprakları']],
+  ['The Hobbit: The Battle of the Five Armies', ['Hobbit: Beş Ordunun Savaşı']],
+  ['Pulp Fiction', ['Ucuz Roman']],
+  ['Reservoir Dogs', ['Rezervuar Köpekleri']],
+  ['Inglourious Basterds', ['Soysuzlar Çetesi']],
+  ['Django Unchained', ['Zincirsiz']],
+  ['The Hateful Eight', ['Nefret Sekizlisi']],
+  ['The Shawshank Redemption', ['Esaretin Bedeli']],
+  ['The Green Mile', ['Yeşil Yol']],
+  ['Fight Club', ['Dövüş Kulübü']],
+  ['The Silence of the Lambs', ['Kuzuların Sessizliği']],
+  ['Gladiator', ['Gladyatör']],
+  ['Braveheart', ['Cesur Yürek']],
+  ['Saving Private Ryan', ['Er Ryan\'ı Kurtarmak']],
+  ['Schindler\'s List', ['Schindler\'in Listesi']],
+  ['Titanic', ['Titanik']],
+  ['Finding Nemo', ['Kayıp Balık Nemo']],
+  ['Toy Story', ['Oyuncak Hikayesi']],
+  ['Ice Age', ['Buz Devri']],
+  ['Madagascar', ['Madagaskar']],
+  ['Monsters, Inc.|Monsters Inc', ['Sevimli Canavarlar']],
+  ['Home Alone', ['Evde Tek Başına']],
+  ['Lethal Weapon', ['Ölümcül Silah']],
+  ['Pirates of the Caribbean: The Curse of the Black Pearl', ['Karayip Korsanları: Kara İnci\'nin Laneti', 'Karayip Korsanları']],
+  ['Mission: Impossible', ['Görevimiz Tehlike']],
+  ['The Godfather', ['Baba', 'Vaftiz Babası']],
+  ['The Godfather Part II', ['Baba 2']],
+  ['Scarface', ['Yaralı Yüz']],
+  ['The Lion King', ['Aslan Kral']],
+  ['Beauty and the Beast', ['Güzel ve Çirkin']],
+  ['The Little Mermaid', ['Küçük Deniz Kızı']],
+  ['Sleeping Beauty', ['Uyuyan Güzel']],
+  ['The Jungle Book', ['Orman Çocuğu']],
+  ['Gone with the Wind', ['Rüzgar Gibi Geçti']],
+  ['Casablanca', ['Kazablanka']],
+  ['Rear Window', ['Arka Pencere']],
+  ['The Exorcist', ['Şeytan', 'Exorcist Şeytan']],
+  ['Friday the 13th', ['13. Cuma', 'Cuma 13']],
+  ['A Nightmare on Elm Street', ['Elm Sokağı Kabusu']],
+  ['The Texas Chain Saw Massacre|The Texas Chainsaw Massacre', ['Teksas Katliamı']],
+  ['Star Wars', ['Yıldız Savaşları']],
+  ['Planet of the Apes', ['Maymunlar Cehennemi']],
+  ['RoboCop', ['Robot Polis']],
+  ['Men in Black', ['Siyah Giyen Adamlar']],
+  ['Ghostbusters', ['Hayalet Avcıları']],
+  ['Commando', ['Komando']],
+  ['The Expendables', ['Harcanabilirler']],
+  ['Inception', ['Başlangıç']],
+  ['Interstellar', ['Yıldızlararası']],
+  ['Memento', ['Akıl Defteri']],
+  ['The Departed', ['Köstebek']],
+  ['Shutter Island', ['Zindan Adası']],
+  ['The Wolf of Wall Street', ['Para Avcısı']],
+  ['Gone Girl', ['Kayıp Kız']],
+  ['Catch Me If You Can', ['Yakalayabilirsen Yakala']],
+  ['The Prestige', ['Prestij']],
+  ['Good Will Hunting', ['Can Dostum']],
+  ['Alice, Sweet Alice|Communion', ['Sevgili Alice', 'Tarikat']]
 ];
 TR_ALIAS_EK.forEach(function (p) {
   p[0].split('|').forEach(function (nm) {
@@ -924,19 +1010,19 @@ var UA_ENGINE = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (K
 function engineQueries(host, titles, trTitles, year) {
   var hw = host.replace(/^my\./, ''), y = year ? ' ' + year : '';
   function clean(s) { return String(s || '').replace(/[:!?,"]+/g, ' ').replace(/\s+/g, ' ').trim(); }
-  var tr1 = clean((trTitles || [])[0]), t0 = clean((titles || [])[0]), t1 = clean((titles || [])[1]);
-  var all = uniq([t0, t1, tr1].filter(Boolean));
-  var en = all.filter(function (n) { return n !== tr1; });
-  var names = uniq(en.concat(tr1 ? [tr1] : [])).slice(0, 3), qs = [];
-  // elle yapılan çalışan sorgular önce: "<ad> tr ok.ru" (İngilizce/orijinal ad, sonra Türkçe ad)
-  names.forEach(function (n) { qs.push(n + ' tr ' + hw); });
-  names.forEach(function (n) { if (y) qs.push(n + y + ' tr ' + hw); });
-  names.forEach(function (n) { qs.push(n + y + ' türkçe dublaj ' + hw); });
-  names.forEach(function (n) { qs.push(n + ' tr dublaj ' + hw); qs.push(n + y + ' ' + hw); });
-  names.forEach(function (n) { qs.push('site:' + host + ' ' + n + y); });
-  var fw = firstWordOf(t0 || tr1);
-  if (fw) { qs.push(fw + y + ' tr ' + hw); qs.push(fw + ' dublaj ' + hw); }
-  return uniq(qs).slice(0, AYAR.MOTOR_SORGU || 8);
+  var trs = uniq((trTitles || []).map(clean).filter(Boolean)).slice(0, 3);
+  var ens = uniq((titles || []).map(clean).filter(Boolean)).filter(function (n) { return trs.indexOf(n) === -1; }).slice(0, 2);
+  var names = uniq([ens[0], trs[0], trs[1], ens[1], trs[2]].filter(Boolean)), qs = [];
+  // elle yapılan çalışan sorgular önce: "<ad> tr ok.ru" (örn. "Yeşil dev tr ok.ru", "alice sweet alice tr ok.ru")
+  names.slice(0, 3).forEach(function (n) { qs.push(n + ' tr ' + hw); });
+  if (y) names.slice(0, 2).forEach(function (n) { qs.push(n + y + ' tr ' + hw); });
+  names.slice(0, 2).forEach(function (n) { qs.push(n + y + ' türkçe dublaj ' + hw); });
+  names.slice(3).forEach(function (n) { qs.push(n + ' tr ' + hw); });
+  names.slice(0, 3).forEach(function (n) { qs.push(n + ' tr dublaj ' + hw); });
+  names.slice(0, 2).forEach(function (n) { qs.push(n + y + ' ' + hw); qs.push('site:' + host + ' ' + n + y); });
+  var fw = firstWordOf(ens[0] || trs[0]);
+  if (fw) { qs.push(fw + y + ' tr ' + hw); }
+  return uniq(qs).slice(0, AYAR.MOTOR_SORGU || 10);
 }
 
 // Google (basit sayfa) + Bing her sorguda; Yandex (touch) ve Google video ilk sorgularda.
@@ -1207,7 +1293,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.10'];
+  dbg = ['v1.5.11'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
