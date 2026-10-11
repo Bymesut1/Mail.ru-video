@@ -1,5 +1,5 @@
 // ============================================================
-//  mailru v1.7.1 — Nuvio scraper (my.mail.ru/video, kullanıcı yüklemeleri)
+//  mailru v1.8.0 — Nuvio scraper (my.mail.ru/video, kullanıcı yüklemeleri)
 //  Akış: TMDB bilgisi -> mail.ru araması -> aday eleme/puanlama
 //        -> video meta JSON -> mp4 linkleri
 // ============================================================
@@ -27,14 +27,7 @@ var AYAR = {
     // örnek: { adlar: ['Film Adı'], yil: 2000, dosya: 'sitedeki.tam.baslik.tr' }
   ],
   // Yükleyen hesabın video listesi (ör. 'https://m.my.mail.ru/mail/KULLANICI/video/'). Doluysa her aramada bu sayfalar da taranır.
-  HESAPLAR: [      // muhammedgngr25 hesabının tüm video listesi (107 video): her aramada taranır, yeni yüklenenler de otomatik gelir
-    'https://m.my.mail.ru/mail/muhammedgngr25/video/',
-    'https://m.my.mail.ru/mail/tr-bogdan/video/',      // arama motorunda çıkan Türkçe yükleyen (Geleceğe Dönüş vb.)
-    'https://my.mail.ru/mail/tr-bogdan/video/_myvideo',
-    'https://my.mail.ru/mail/muhammedgngr25/video/_myvideo',
-    'https://m.my.mail.ru/mail/zardozman/video/',      // Yandex'te "rambo tr mail.ru" ile çıkan yükleyenler
-    'https://m.my.mail.ru/mail/filmakinesi5/video/'
-  ],
+  HESAPLAR: [],    // v1.8.0: hesap listesi taraması KAPALI (sadece DOGRUDAN + Yandex)
   // DOĞRUDAN BAĞLANTI: arama motorunda gördüğün, adı bilinen video. Bu filmde TMDB adı/yılı tutunca başlık eşleşmesi aranmadan listeye girer.
   //  adlar: TMDB'deki herhangi bir ad | yil: TMDB yılı | yol: my.mail.ru adresinin yol kısmı | sure: "s:dk:sn" (varsa)
   DOGRUDAN: [
@@ -45,59 +38,7 @@ var AYAR = {
   // HAZIR LİSTE: sayfada görülen videolar [numara, dosya adı, süre]. İnternet/arama gerekmeden aday olarak eklenir
   // (adres: ARSIV_YOL + numara + '.html'); sonra diğer adaylarla aynı şekilde TMDB adı/yıl/süre ile eşleştirilir.
   ARSIV_YOL: '/mail/muhammedgngr25/video/_myvideo/',
-  ARSIV: [
-    [39, "Şimşek Adam (The Flash Tv Series - Pilot) 1990 DVDRip 720p tr", "1:33:48"],
-    [147, "Şey.The.Thing.1982.1080p.BluRay.x264.TR.ENG.Dual.tr", "1:48:36"],
-    [130, "ttt.85372.Bnka.sygnu.tr.2007", "1:18:05"],
-    [111, "tt79575.Zor hedef fare.tr", "1:37:40"],
-    [131, "tt5967.efsanetr", "1:37:26"],
-    [143, "tt1464540.I.Am.Number.Four.2011.1080p.TR", "1:49:34"],
-    [54, "tt0486576.4.Rise.of.the.Silver.Surfer.2007.1080p.TR.mp4", "1:31:51"],
-    [140, "tt0316396.Peter.Pan.2003.1080p.TR", "1:53:21"],
-    [44, "tt0290095.The.Tuxedo.2002.TR", "1:34:44"],
-    [35, "tt0216216.The.6th.Day.2000.1080p.TR", "2:03:34"],
-    [148, "tt0120789.Pleasantville.1998.1080p.TR", "2:04:31"],
-    [53, "tt0120667.Fantastic.Four.2005.1080p.TR.mp4", "1:45:29"],
-    [43, "tt0100814.Tremors.1990.1080p.TR", "1:35:43"],
-    [14, "tt0099088.Back.to.the.Future.Part.III.1990.1080p.TR.dual", "1:58:17"],
-    [13, "tt0096874.Back.to.the.Future.Part.II.1989.1080p.TR.dual", "1:47:59"],
-    [12, "tt0088763.Back.to.the.Future.Part.I.1985.1080p.TR.dual", "1:56:01"],
-    [28, "tt0083944.Rambo.First.Blood.1982.TR", "1:33:16"],
-    [21, "tt0080179.Drunken.Master.1978.1080p.TR", "1:51:14"],
-    [36, "tt0054387.The.Time.Machine.1960.1080p.TR", "1:42:41"],
-    [110, "tt.975467Büyük.Hazine.tr", "2:11:04"],
-    [109, "tt.655776Büyük.Hazine2.tr", "2:04:32"],
-    [119, "tt.57556Kartalın.Gölgesindeki.Yılan.tr", "1:37:39"],
-    [45, "tt.57556.Örümcek Adam.tr", "2:01:12"],
-    [46, "tt.57556.Örümcek Adam 3.tr", "2:19:11"],
-    [48, "tt.57556.Örümcek Adam 2.tr", "2:07:28"],
-    [74, "tt.57556.Çılgın Çocuklar.tr", "1:30:50"],
-    [50, "tt.57556.Zaman Yolcu.tr", "1:22:42"],
-    [49, "tt.57556.Zaman Tüneli.tr.2002", "1:35:45"],
-    [59, "tt.57556.Uçan Daire.tr", "1:29:39"],
-    [106, "tt.57556.Transporter 2.tr", "1:27:38"],
-    [107, "tt.57556.Taşıyıcı 3.tr", "1:37:42"],
-    [82, "tt.57556.Taşıyıcı 1 2002", "1:32:09"],
-    [79, "tt.57556.Rambo 5.tr", "1:40:23"],
-    [78, "tt.57556.Rambo 4.tr", "1:31:30"],
-    [52, "tt.57556.Rambo 3.tr", "1:41:40"],
-    [29, "tt.57556.Rambo 2 İlk Kan (1985).mkv", "1:36:00"],
-    [51, "tt.57556.Limitless.tr", "1:45:33"],
-    [117, "tt.57556.Korkunç Bir Film1.tr", "1:28:39"],
-    [72, "tt.57556.Kara Yıldırım.tr", "1:46:06"],
-    [61, "tt.57556.Hayalet Sürücü 2.tr", "1:35:31"],
-    [60, "tt.57556.Hayalet Sürücü 1 (2007).mkv", "2:03:25"],
-    [34, "tt.57556.Evde Tek Başına2.tr", "2:00:01"],
-    [31, "tt.57556.Evde Tek Başına.tr", "1:42:55"],
-    [62, "tt.57556.Bugün.aslinda.dundu.tr", "1:41:03"],
-    [118, "tt.57556.Bilinmeyen Yol.tr", "1:52:16"],
-    [108, "tt.57556.Banliyö 13 Ultimatum", "1:40:33"],
-    [86, "tt.57556.Banliyö 13 (2004)", "1:24:34"],
-    [1, "robot.evolver.tr", "1:31:42"],
-    [122, "Zorro.2.2008.1080p.BrRip.x264.TR.3dfi", "2:10:27"],
-    [73, "Yenilmez - 2 ( 2006 )", "1:37:35"],
-    [15, "a.kid.in.aladdin's.Palace.tr", "1:29:32"]
-  ],
+  ARSIV: [],       // v1.8.0: hazır liste KAPALI
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 12, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
   MOTOR_SORGU: 12,   // arama motorlarına en fazla kaç sorgu gitsin (Google+Yandex ilk 5, diğerleri ilk 2 sorguda)
@@ -106,7 +47,7 @@ var AYAR = {
   HIZLI_PENCERE: 3500, // ms: hazır liste/doğrudan bağlantıdan akış çıktıysa arama motorlarını en fazla bu kadar bekle
   GENEL_SURE: 22000,   // ms: toplam üst sınır; dolunca o ana kadar bulunan akışlar VERİLİR (boş dönmez)
   KAYNAK_SURESI: 6000, // ms: kaynak çekme aşaması en geç bu sürede biter
-  PARALEL_MOTOR: 3,    // arama motoru istekleri ayrı kuyrukta, en fazla bu kadar eş zamanlı (hesap listesi sayfalarını aç bırakmasın)
+  PARALEL_MOTOR: 4,    // arama motoru istekleri ayrı kuyrukta, en fazla bu kadar eş zamanlı (hesap listesi sayfalarını aç bırakmasın)
   PARALEL: 8,          // aynı anda en fazla kaç arama/sayfa isteği (kaynak/meta istekleri bu sınıra takılmaz, öncelikli)
   MOTOR_ADAY: 14,      // arama motorundan gelen en fazla kaç adresin meta bilgisi doğrulansın
   HESAP_OGREN: true,   // arama motorunda bulunan yeni yükleyen hesaplar da taransın ve sonraki aramalar için hatırlansın
@@ -114,7 +55,7 @@ var AYAR = {
   RETRY_MAX: 12,       // bir film aramasında toplam en fazla kaç yeniden deneme (telefonu/ağı boğmasın)
   RETRY_BEKLE: 700,    // ms: yeniden denemeden önce bekleme (429 gelirse 1500ms, Retry-After varsa o, en fazla 2500ms)
   RETRY_SON: 14000,    // ms: aramanın bu süresinden sonra yeni deneme başlatılmaz (GENEL_SURE'ye takılmamak için)
-  SURUM: '1.7.1'
+  SURUM: '1.8.0'
 };
 
 // Türkçe adı TMDB'de görünmeyen / farklı yazılan filmler: orijinal ad (harf-rakam, küçük) -> Türkçe adlar
@@ -474,8 +415,7 @@ function geciciHata(r) {
   return r.status === 0 || r.status === 429 || r.status === 202 || r.status >= 500 || (r.status === 200 && !r.text);
 }
 function yenidenDenenir(r, label) {
-  return AYAR.RETRY && geciciHata(r) && !/^E/.test(label || '') &&      // arama motorları (E...) denenmez: 429'u kalıcıdır, süre yakar
-    RT.n < (AYAR.RETRY_MAX || 0) && (Date.now() - RT.t0) < (AYAR.RETRY_SON || 14000);
+  return AYAR.RETRY && geciciHata(r) && RT.n < (AYAR.RETRY_MAX || 0) && (Date.now() - RT.t0) < (AYAR.RETRY_SON || 14000);
 }
 
 function getRawNow(url, headers, label) {
@@ -1025,21 +965,12 @@ function engineQueries(host, titles, trTitles, year) {
 // (aynı anda yüzlerce istek telefonu boğuyordu).
 function engineUrls(q, qi) {
   var e = encodeURIComponent(q), all = [
-    'https://www.google.com/search?q=' + e + '&hl=tr&source=hp',                          // mobil Google
     'https://yandex.com.tr/search/touch/?text=' + e + '&lr=11508',                         // mobil Yandex
-    'https://www.google.com/search?q=' + e + '&hl=tr&num=30&gbv=1',
     'https://yandex.com.tr/search/?text=' + e,
-    'https://html.duckduckgo.com/html/?q=' + e + '&kl=tr-tr',
-    'https://www.bing.com/search?q=' + e + '&setlang=tr&count=30',
-    'https://search.brave.com/search?q=' + e + '&source=web',
-    'https://www.google.com/search?tbm=vid&q=' + e + '&hl=tr&num=30',
     'https://yandex.com.tr/video/search?text=' + e,
-    'https://www.bing.com/videos/search?q=' + e + '&setlang=tr',
-    'https://lite.duckduckgo.com/lite/?q=' + e + '&kl=tr-tr',
-    'https://yandex.com/search/?text=' + e,
-    'https://www.mojeek.com/search?q=' + e
+    'https://yandex.com/search/?text=' + e
   ];
-  var cap = qi === 0 ? 13 : qi <= 2 ? 6 : qi <= 5 ? 3 : 0;
+  var cap = qi === 0 ? 4 : qi <= 3 ? 2 : 1;
   return all.slice(0, cap);
 }
 function engineHeaders(u) {
@@ -1402,7 +1333,6 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
           if (!seenUrl[s.url]) { seenUrl[s.url] = true; streams.push(s); }
         });
       });
-      if (used.length) kaydet(tmdbId, used);
       return streams;
     }
 
@@ -1411,12 +1341,6 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
       if (!e || !e.yol || (e.yil && year && e.yil !== year)) return;
       if (!(e.adlar || []).some(function (a) { return wants.some(function (w) { return norm(w) === norm(a); }); })) return;
       addItem({ path: e.yol, id: '', durText: e.sure || '', dur: parseDuration(e.sure), title: '', direct: true });
-    });
-    var hafiza = GORULEN[String(tmdbId)] || [];
-    hafiza.forEach(function (c) { addItem({ path: c.path, id: c.id, durText: c.durText, dur: c.dur, title: c.title }); });
-    if (hafiza.length) dbg.push('hafiza ' + hafiza.length);
-    (AYAR.ARSIV || []).forEach(function (a) {
-      addItem({ path: AYAR.ARSIV_YOL + a[0] + '.html', id: '', durText: a[2], dur: parseDuration(a[2]), title: a[1] });
     });
     rankAll();
     var fast = sureOf(ranked).slice(0, 4);
@@ -1429,63 +1353,21 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
       }, function () {});
     }
 
-    // ---- ARAMA: sıra önemli (kuyruk sırayla boşalır): önce ilk 8 site sorgusu, sonra yükleyen hesaplar, sonra arama motorları, en son kalan sorgular ----
-    var mainQ = (trWants[0] || titles[0] || '').replace(/\s+/g, ' ').trim();
+    // ---- ARAMA: SADECE Yandex (TR / Türkçe dublaj ifadeleriyle). Site araması ve hesap listeleri kapalı. ----
     var jobs = [];
-    function qJob(i) {
-      var q = queries[i];
-      var pages = (q === mainQ || /^\d{4} /.test(q)) ? 2 : (i < 4 ? AYAR.MAX_SAYFA : 0);   // sadece-ad sorgusu en çok sayfa okur
-      jobs.push(searchOnce(q, i + 1, pages, sinks[i]));
-    }
-    var i0;
-    for (i0 = 0; i0 < Math.min(8, queries.length); i0++) qJob(i0);
-    (AYAR.HESAPLAR || []).forEach(function (u, hi) {                       // yükleyen hesabın tüm listesi
-      var hs = [];
-      sinks.push(hs);
-      jobs.push(getRaw(u, null, 'H' + hi).then(function (r) {
-        var items = r.ok ? parseSearch(r.text) : [];
-        hs.push.apply(hs, items);
-        return items.length ? morePages(r.text, items, AYAR.HESAP_SAYFA, 'H' + hi, hs) : items;
-      }));
-    });
-    if (AYAR.ARAMA_MOTORU) jobs.push(engineRun(engineQueries('my.mail.ru', titles, trWants, year), parseEngine, engSink, engineFetch, engAcc));
-    for (i0 = 8; i0 < queries.length; i0++) qJob(i0);
+    var engQs = engineQueries('my.mail.ru', titles, trWants, year);
+    if (AYAR.ARAMA_MOTORU) jobs.push(engineRun(engQs, parseEngine, engSink, engineFetch, engAcc));
 
     // hazır akış varsa arama motorlarını kısa bekle, yoksa tam süre bekle
     return waitWithin(jobs, haveFast ? AYAR.HIZLI_PENCERE : AYAR.ARAMA_SURESI).then(function () {
       sinks.forEach(function (l) { l.forEach(addItem); });
       dbg.push('sonuc ' + all.length + ' ' + (Date.now() - T0) + 'ms');
       dbg.push('retry ' + RT.n + '/' + RT.ok);
-      if (AYAR.DEBUG_MODU) {
-        dbg.push('sorgu sayilari ' + sinks.slice(0, queries.length).map(function (l) { return l.length; }).join(','));
-        queries.slice(0, 10).forEach(function (q, i) { dbg.push('q' + (i + 1) + ' [' + sinks[i].length + '] ' + q); });
-      }
+      if (AYAR.DEBUG_MODU) { dbg.push('yandex adres ' + engSink.length); engQs.slice(0, 6).forEach(function (q, i) { dbg.push('y' + (i + 1) + ' ' + q); }); }
       rankAll();
       dbg.push('aday ' + ranked.length);
 
-      // arama motorlarında görülen yeni yükleyen hesapları hatırla (sonraki filmlerde de kullanılır)
-      engAcc.forEach(function (a) { if (OGRENILEN.indexOf(a) === -1) OGRENILEN.push(a); });
-      if (OGRENILEN.length > 30) OGRENILEN.splice(0, OGRENILEN.length - 30);
-      if (engAcc.length) dbg.push('motor hesap ' + engAcc.slice(0, 6).join(','));
-
-      var sureNow = sureOf(ranked).length;
-      var knownAcc = (AYAR.HESAPLAR || []).join('|').toLowerCase();
-      var learned = [];
-      if (AYAR.HESAP_OGREN && sureNow < 2) {          // yeterli aday yoksa: motorlarda çıkan / daha önce öğrenilen hesapların listesini tara
-        learned = uniq(engAcc.concat(OGRENILEN.slice(-3))).filter(function (u) { return knownAcc.indexOf('/mail/' + u + '/') === -1; })
-          .slice(0, 4).map(function (u) { return AYAR.MOBILE + '/mail/' + u + '/video/'; });
-      }
-      // Arama dosyayı getirmediyse: yükleyen hesabın kendi video listesini tara (garanti listesi ya da hiç aday yoksa)
-      var needScan = !ranked.length || (ctx.manuel.length && !ranked.some(function (x) { return x.r.score === 999; }));
-      var accs = uniq(learned.concat(needScan ? (AYAR.HESAPLAR || []).concat(accountsOf(all).map(function (a) { return AYAR.MOBILE + a; })) : []));
-      var scanP = accs.length ? waitWithin(accs.map(function (u, ai) {
-        var hs = [];
-        return scanList(u, AYAR.HESAP_SAYFA, hs, ai).then(function () {
-          var add = 0;
-          hs.forEach(function (it) { if (addItem(it)) add++; });
-          dbg.push('hesap ' + u.replace(/^https?:\/\/[^\/]+/, '') + ' +' + add);
-        });
-      }), 3800) : Promise.resolve();
+      var accs = [], scanP = Promise.resolve();
 
       // arama motoru adreslerinin gerçek başlık/süresini meta bilgisinden doğrula (yeterli aday varsa kısa, yoksa uzun bekle)
       function motorDogrula(win) {
@@ -1509,12 +1391,9 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
         return motorDogrula(sureOf(ranked).length >= 1 ? 3500 : 7000);
       }).then(function () {
         if (ranked.length || !AYAR.RETRY || (Date.now() - T0) > (AYAR.RETRY_SON || 14000)) return;
-        dbg.push('ikinci tur');                                         // hiç aday yok: ilk 3 site aramasını bir kez daha yap
-        var s2 = [];
-        var j2 = queries.slice(0, 3).map(function (q, qi) { return searchOnce(q, 'R' + (qi + 1), 0, s2).catch(function () {}); });
-        return waitWithin(j2, 4500).then(function () {
-          s2.forEach(addItem); rankAll();
-          dbg.push('ikinci tur aday ' + ranked.length);
+        dbg.push('ikinci tur');                                         // hiç aday yok: ilk 2 Yandex sorgusunu bir kez daha çalıştır
+        return waitWithin([engineRun(engQs.slice(0, 2), parseEngine, engSink, engineFetch, engAcc)], 5000).then(function () {
+          return motorDogrula(4000);
         });
       }).then(function () {
         if (!ranked.length) return debugStream('uygun video yok: ' + (info.title || info.original_title) + ' ' + year);
