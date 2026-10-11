@@ -103,13 +103,14 @@ var AYAR = {
   MOTOR_SORGU: 12,   // arama motorlarına en fazla kaç sorgu gitsin (Google+Yandex ilk 5, diğerleri ilk 2 sorguda)
   ARAMA_MOTORU: true,
   ARAMA_SURESI: 8000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
-  HIZLI_PENCERE: 3500, // ms: hazır liste/doğrudan bağlantıdan akış çıktıysa arama motorlarını en fazla bu kadar bekle
-  GENEL_SURE: 22000,   // ms: toplam üst sınır; dolunca o ana kadar bulunan akışlar VERİLİR (boş dönmez)
+  HIZLI_PENCERE: 1800, // ms: hazır liste/doğrudan bağlantıdan akış çıktıysa arama motorlarını en fazla bu kadar bekle
+  GENEL_SURE: 15000,   // ms: toplam üst sınır; dolunca o ana kadar bulunan akışlar VERİLİR (boş dönmez)
   KAYNAK_SURESI: 4500, // ms: kaynak çekme aşaması en geç bu sürede biter
   PARALEL: 8,          // aynı anda en fazla kaç arama/sayfa isteği (kaynak/meta istekleri bu sınıra takılmaz, öncelikli)
   MOTOR_ADAY: 14,      // arama motorundan gelen en fazla kaç adresin meta bilgisi doğrulansın
   HESAP_OGREN: true,   // arama motorunda bulunan yeni yükleyen hesaplar da taransın ve sonraki aramalar için hatırlansın
-  SURUM: '1.6.0'
+  ILK_KALITE: 720,     // hızlı başlangıç: önce bu çözünürlüğe en yakın (altındaki) akış gelir; 1080p ağır dosya buffering yapıyordu
+  SURUM: '1.7.0'
 };
 
 // Türkçe adı TMDB'de görünmeyen / farklı yazılan filmler: orijinal ad (harf-rakam, küçük) -> Türkçe adlar
@@ -1123,9 +1124,13 @@ function makeStreams(item, ranked, meta) {
   vids.sort(function (a, b) { return b.h - a.h; });
   if (!vids.length) return [];
 
-  // en yüksek kalite + (varsa) en düşük kalite
-  var picks = [vids[0]];
-  if (ranked.tier <= 1 && vids.length > 1 && vids[vids.length - 1].h !== vids[0].h) picks.push(vids[vids.length - 1]);
+  // hızlı başlangıç: ILK_KALITE'ye en yakın (altındaki) akış EN BAŞTA, sonra en yüksek, sonra (varsa) en düşük kalite
+  var lim = AYAR.ILK_KALITE || 720, fast = null;
+  vids.forEach(function (v) { if (v.h > 0 && v.h <= lim && (!fast || v.h > fast.h)) fast = v; });
+  var picks = [];
+  if (fast) picks.push(fast);
+  if (picks.indexOf(vids[0]) === -1) picks.push(vids[0]);
+  if (ranked.tier <= 1 && vids.length > 1 && picks.indexOf(vids[vids.length - 1]) === -1) picks.push(vids[vids.length - 1]);
 
   var parts = [ranked.lang];
   if (ranked.info.part) parts.push('Part ' + ranked.info.part);
@@ -1140,7 +1145,7 @@ function makeStreams(item, ranked, meta) {
     // name: eklenti adı HER ZAMAN başta (kart başlığı olarak gösterilir); title: ayrıntı satırı
     return {
       name: AYAR.EKLENTI_ADI + ' - ' + ranked.lang + ' ' + q,
-      title: AYAR.EKLENTI_ADI + ' | ' + label.join(' | '),
+      title: AYAR.EKLENTI_ADI + ' | ' + label.join(' | ') + (v === fast ? ' | \u26A1 Hızlı başlangıç' : ''),
       url: v.url,
       quality: v.key || 'Auto',
       type: 'mp4',
