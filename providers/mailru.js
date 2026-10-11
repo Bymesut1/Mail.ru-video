@@ -358,7 +358,7 @@ var TR_ALIAS_EK = [
   ["A Kid in Aladdin's Palace", ["Alaaddin'in Sarayı", "Alaaddin'in Sarayında Bir Çocuk"]],
   ['The Tuxedo', ['Smokin']],
   ['Hulk', ['Yeşil Dev', 'Yeşil Dev Hulk', 'Hulk Yeşil Dev']],
-  ['The Incredible Hulk|Incredible Hulk', ['İnanılmaz Hulk', 'Yeşil Dev', 'Yeşil Dev Hulk', 'Yeşil Dev Hulk 2', 'Hulk 2']],
+  ['The Incredible Hulk|Incredible Hulk', ['Yeşil Dev', 'İnanılmaz Hulk', 'Yeşil Dev Hulk', 'Yeşil Dev Hulk 2', 'Hulk 2']],
   ['Batman Begins', ['Batman Başlıyor']],
   ['The Dark Knight', ['Kara Şövalye']],
   ['The Dark Knight Rises', ['Kara Şövalye Yükseliyor']],
@@ -1015,7 +1015,7 @@ function engineQueries(host, titles, trTitles, year) {
   var names = uniq([ens[0], trs[0], trs[1], ens[1], trs[2]].filter(Boolean)), qs = [];
   // elle yapılan çalışan sorgular önce: "<ad> tr ok.ru" (örn. "Yeşil dev tr ok.ru", "alice sweet alice tr ok.ru")
   names.slice(0, 3).forEach(function (n) { qs.push(n + ' tr ' + hw); });
-  names.slice(0, 2).forEach(function (n) {   // 'yeşildev tr ok.ru' gibi bitişik yazım da denenir
+  trs.slice(0, 2).forEach(function (n) {   // 'yeşildev tr ok.ru' gibi bitişik yazım da denenir (Türkçe adlar)
     var sq = n.toLowerCase().replace(/\s+/g, '');
     if (/\s/.test(n) && sq.length >= 6) qs.push(sq + ' tr ' + hw);
   });
@@ -1297,7 +1297,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.12'];
+  dbg = ['v1.5.13'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
