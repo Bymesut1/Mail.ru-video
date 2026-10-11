@@ -1,5 +1,5 @@
 // ============================================================
-//  mailru v1.7.0 — Nuvio scraper (my.mail.ru/video, kullanıcı yüklemeleri)
+//  mailru v1.7.1 — Nuvio scraper (my.mail.ru/video, kullanıcı yüklemeleri)
 //  Akış: TMDB bilgisi -> mail.ru araması -> aday eleme/puanlama
 //        -> video meta JSON -> mp4 linkleri
 // ============================================================
@@ -9,7 +9,7 @@ var AYAR = {
   MOBILE: 'https://m.my.mail.ru',
   EKLENTI_ADI: 'mailru',   // manifest adıyla AYNI olmalı: akış kartında eklenti adı hep görünsün
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
-  DEBUG_MODU: false,
+  DEBUG_MODU: true,
   MIN_SURE: 300,   // sn: bundan kısa videolar (fragman/kesit) hariç; süre uyumu ARANMAZ. 0 yaparsan hiç eleme olmaz
   MAX_ADAY: 20,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 20,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
@@ -105,7 +105,8 @@ var AYAR = {
   ARAMA_SURESI: 8000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
   HIZLI_PENCERE: 3500, // ms: hazır liste/doğrudan bağlantıdan akış çıktıysa arama motorlarını en fazla bu kadar bekle
   GENEL_SURE: 22000,   // ms: toplam üst sınır; dolunca o ana kadar bulunan akışlar VERİLİR (boş dönmez)
-  KAYNAK_SURESI: 4500, // ms: kaynak çekme aşaması en geç bu sürede biter
+  KAYNAK_SURESI: 6000, // ms: kaynak çekme aşaması en geç bu sürede biter
+  PARALEL_MOTOR: 3,    // arama motoru istekleri ayrı kuyrukta, en fazla bu kadar eş zamanlı (hesap listesi sayfalarını aç bırakmasın)
   PARALEL: 8,          // aynı anda en fazla kaç arama/sayfa isteği (kaynak/meta istekleri bu sınıra takılmaz, öncelikli)
   MOTOR_ADAY: 14,      // arama motorundan gelen en fazla kaç adresin meta bilgisi doğrulansın
   HESAP_OGREN: true,   // arama motorunda bulunan yeni yükleyen hesaplar da taransın ve sonraki aramalar için hatırlansın
@@ -113,7 +114,7 @@ var AYAR = {
   RETRY_MAX: 12,       // bir film aramasında toplam en fazla kaç yeniden deneme (telefonu/ağı boğmasın)
   RETRY_BEKLE: 700,    // ms: yeniden denemeden önce bekleme (429 gelirse 1500ms, Retry-After varsa o, en fazla 2500ms)
   RETRY_SON: 14000,    // ms: aramanın bu süresinden sonra yeni deneme başlatılmaz (GENEL_SURE'ye takılmamak için)
-  SURUM: '1.7.0'
+  SURUM: '1.7.1'
 };
 
 // Türkçe adı TMDB'de görünmeyen / farklı yazılan filmler: orijinal ad (harf-rakam, küçük) -> Türkçe adlar
@@ -386,6 +387,20 @@ var PROVIDER_ID = 'mailru';
 var ANDROID_UA = 'Mozilla/5.0 (Linux; Android 13; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36';
 
 var dbg = [];
+// Bu oturumda akış verdiği görülen videolar (film başına): bir sonraki aramada hemen yeniden denenir, yarış kaybedilse bile kaybolmaz
+var GORULEN = {};
+function kaydet(id, items) {
+  try {
+    var k = String(id), cur = GORULEN[k] || [];
+    items.forEach(function (it) {
+      if (it.direct || !it.title) return;
+      if (!cur.some(function (c) { return c.path === it.path; })) cur.push({ path: it.path, id: it.id || '', title: it.title, dur: it.dur || 0, durText: it.durText || '' });
+    });
+    GORULEN[k] = cur.slice(-8);
+    var keys = Object.keys(GORULEN);
+    if (keys.length > 40) delete GORULEN[keys[0]];
+  } catch (e) {}
+}
 function log(m) { try { console.log('[mailru] ' + m); } catch (e) {} }
 
 // ---------------- Yardımcılar ----------------
@@ -411,23 +426,25 @@ function pageHeaders(extra) {
 
 // Eşzamanlılık sınırı: onlarca isteği aynı anda atmak telefonu/ağı boğuyor, asıl video isteği geç kalıyor veya düşüyordu.
 // Öncelikli istekler (video meta/kaynak) sıraya girmez.
-var Q = { active: 0, list: [] };
-function schedule(fn) {
+var Q = { active: 0, list: [], max: function () { return AYAR.PARALEL || 8; } };
+var QE = { active: 0, list: [], max: function () { return AYAR.PARALEL_MOTOR || 3; } };   // arama motorları: ayrı kuyruk
+function schedule(fn, q) {
+  q = q || Q;
   return new Promise(function (resolve, reject) {
     function run() {
-      Q.active++;
+      q.active++;
       var p; try { p = fn(); } catch (e) { p = Promise.reject(e); }
-      p.then(function (v) { Q.active--; pump(); resolve(v); }, function (e) { Q.active--; pump(); reject(e); });
+      p.then(function (v) { q.active--; pump(q); resolve(v); }, function (e) { q.active--; pump(q); reject(e); });
     }
-    Q.list.push(run); pump();
+    q.list.push(run); pump(q);
   });
 }
-function pump() { while (Q.active < (AYAR.PARALEL || 8) && Q.list.length) Q.list.shift()(); }
+function pump(q) { q = q || Q; while (q.active < q.max() && q.list.length) q.list.shift()(); }
 
 // { status, ok, text, cookie }  — cookie: yanıttaki video_key (varsa)
 function getRaw(url, headers, label, prio) {
   if (!prio && !/^(M|PG|PT)/.test(label || '')) {
-    return schedule(function () { return getRawNow(url, headers, label); });
+    return schedule(function () { return getRawNow(url, headers, label); }, /^E/.test(label || '') ? QE : Q);
   }
   return getRawNow(url, headers, label);
 }
@@ -1359,7 +1376,7 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
       });
       ranked.sort(function (a, b) { return (a.r.tier - b.r.tier) || (b.r.score - a.r.score); });
     }
-    var metaCache = {};
+    var metaCache = {}, used = [];
     function metaOf(it) {
       if (it.metaHazir) return Promise.resolve(it.metaHazir);
       if (!metaCache[it.path]) metaCache[it.path] = fetchMeta(it).then(function (m) { return m; }, function () { return null; }).then(function (m) {
@@ -1379,10 +1396,13 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
           else if (AYAR.BELIRSIZ_GOSTER) { x.r.lang = 'Dil ?'; x.r.tier = 3; }
           else { dbg.push('dil belirsiz ' + x.item.title.slice(0, 30)); return; }
         }
-        makeStreams(x.item, x.r, metas[i]).forEach(function (s) {
+        var ms = makeStreams(x.item, x.r, metas[i]);
+        if (ms.length && used.indexOf(x.item) === -1) used.push(x.item);
+        ms.forEach(function (s) {
           if (!seenUrl[s.url]) { seenUrl[s.url] = true; streams.push(s); }
         });
       });
+      if (used.length) kaydet(tmdbId, used);
       return streams;
     }
 
@@ -1392,6 +1412,9 @@ function getStreamsInner(tmdbId, mediaType, season, episode, holder) {
       if (!(e.adlar || []).some(function (a) { return wants.some(function (w) { return norm(w) === norm(a); }); })) return;
       addItem({ path: e.yol, id: '', durText: e.sure || '', dur: parseDuration(e.sure), title: '', direct: true });
     });
+    var hafiza = GORULEN[String(tmdbId)] || [];
+    hafiza.forEach(function (c) { addItem({ path: c.path, id: c.id, durText: c.durText, dur: c.dur, title: c.title }); });
+    if (hafiza.length) dbg.push('hafiza ' + hafiza.length);
     (AYAR.ARSIV || []).forEach(function (a) {
       addItem({ path: AYAR.ARSIV_YOL + a[0] + '.html', id: '', durText: a[2], dur: parseDuration(a[2]), title: a[1] });
     });
