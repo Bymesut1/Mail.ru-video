@@ -92,9 +92,10 @@ var AYAR = {
   ],
   BELIRSIZ_GOSTER: true,  // dili doğrulanamayan (etiketsiz / sadece Dual) adaylar "Dil ?" etiketiyle en sona eklensin
   MAX_BELIRSIZ: 12, // etiketsiz/Dual adaylardan en fazla kaçının ses parçası kontrol edilsin
-  MOTOR_SORGU: 10,   // arama motorlarına en fazla kaç sorgu gitsin (Google+Yandex ilk 5, diğerleri ilk 2 sorguda)
+  MOTOR_SORGU: 8,   // arama motorlarına en fazla kaç sorgu gitsin; MOTOR_SURE: bu aşamanın üst sınırı (ms)
+  MOTOR_SURE: 11000,
   ARAMA_MOTORU: true,
-  ARAMA_SURESI: 9000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
+  ARAMA_SURESI: 12000,  // ms: arama aşaması en geç bu sürede biter (bitmeyenler atlanır)
   GENEL_SURE: 36000,   // ms: toplam üst sınır
   KAYNAK_SURESI: 4500  // ms: kaynak çekme aşaması en geç bu sürede biter
 };
@@ -728,7 +729,7 @@ function langInfo(info) {
   var dual = any(/dual|^cift$/);
   var dublaj = any(/dublaj|^trdub/);
   var sub = any(/altyaz|^sub$|^subs$|subtitle/);
-  var foreign = any(/^(rus|russian|rusca|ru|ukr|ukrainian|ger|german|deu|fre|french|fra|spa|spanish|ita|italian|hin|hindi|kor|korean|jpn|japanese|chi|chinese|pol|por|arabic|ar|arapca|farsi|persian)$/);
+  var foreign = any(/^(rus|russian|rusca|ru|ukr|ukrainian|ger|german|deu|fre|french|truefrench|vff|vfq|vf|vostfr|multi|fra|spa|spanish|ita|italian|hin|hindi|kor|korean|jpn|japanese|chi|chinese|pol|por|arabic|ar|arapca|farsi|persian)$/);
   var en = any(/^en$|^eng$|^english$|ingilizce/);
   var dubOnly = any(/^dub$/) && !foreign && !en;          // "Dub.Frekans"
   if (dubOnly) { tr = true; dublaj = true; }
@@ -924,29 +925,28 @@ function engineQueries(host, titles, trTitles, year) {
   var hw = host.replace(/^my\./, ''), y = year ? ' ' + year : '';
   function clean(s) { return String(s || '').replace(/[:!?,"]+/g, ' ').replace(/\s+/g, ' ').trim(); }
   var tr1 = clean((trTitles || [])[0]), t0 = clean((titles || [])[0]), t1 = clean((titles || [])[1]);
-  var names = uniq([tr1, t0, t1].filter(Boolean)).slice(0, 3), qs = [];
-  names.forEach(function (n) { qs.push(n + y + ' tr ' + hw); qs.push(n + y + ' türkçe dublaj ' + hw); });
-  names.forEach(function (n) { qs.push(n + ' tr dublaj ' + hw); qs.push('site:' + host + ' ' + n + y); qs.push(n + y + ' ' + hw); });
-  if (names[0]) qs.push(names[0] + ' 1080p tr ' + hw);
+  var all = uniq([t0, t1, tr1].filter(Boolean));
+  var en = all.filter(function (n) { return n !== tr1; });
+  var names = uniq(en.concat(tr1 ? [tr1] : [])).slice(0, 3), qs = [];
+  // elle yapılan çalışan sorgular önce: "<ad> tr ok.ru" (İngilizce/orijinal ad, sonra Türkçe ad)
+  names.forEach(function (n) { qs.push(n + ' tr ' + hw); });
+  names.forEach(function (n) { if (y) qs.push(n + y + ' tr ' + hw); });
+  names.forEach(function (n) { qs.push(n + y + ' türkçe dublaj ' + hw); });
+  names.forEach(function (n) { qs.push(n + ' tr dublaj ' + hw); qs.push(n + y + ' ' + hw); });
+  names.forEach(function (n) { qs.push('site:' + host + ' ' + n + y); });
   var fw = firstWordOf(t0 || tr1);
   if (fw) { qs.push(fw + y + ' tr ' + hw); qs.push(fw + ' dublaj ' + hw); }
-  return uniq(qs).slice(0, AYAR.MOTOR_SORGU || 10);
+  return uniq(qs).slice(0, AYAR.MOTOR_SORGU || 8);
 }
 
-// Google + Yandex (ilk 5 sorgu), DuckDuckGo + Bing + Brave (ilk 2 sorgu)
-function engineUrls(q, wide, narrow) {
+// Google (basit sayfa) + Bing her sorguda; Yandex (touch) ve Google video ilk sorgularda.
+// DuckDuckGo (202/anomali), Brave (429) ve yandex.com (captcha) bu ağda hep engellendiği için çıkarıldı.
+function engineUrls(q, qi) {
   var e = encodeURIComponent(q), out = [];
-  if (wide) {
-    out.push('https://www.google.com/search?q=' + e + '&hl=tr&num=30&gbv=1');
-    out.push('https://www.google.com/search?tbm=vid&q=' + e + '&hl=tr&num=30');
-    out.push('https://yandex.com.tr/search/?text=' + e);
-    out.push('https://yandex.com/search/?text=' + e);
-  }
-  if (narrow) {
-    out.push('https://html.duckduckgo.com/html/?q=' + e + '&kl=tr-tr');
-    out.push('https://www.bing.com/search?q=' + e + '&setlang=tr&count=30');
-    out.push('https://search.brave.com/search?q=' + e + '&source=web');
-  }
+  out.push('https://www.google.com/search?q=' + e + '&hl=tr&num=30&gbv=1');
+  out.push('https://www.bing.com/search?q=' + e + '&setlang=tr&count=30');
+  if (qi < 4) out.push('https://yandex.com.tr/search/touch/?text=' + e.replace(/%20/g, '+') + '&lr=103841');
+  if (qi < 2) out.push('https://www.google.com/search?tbm=vid&q=' + e + '&hl=tr&num=30');
   return out;
 }
 function engineHeaders(u) {
@@ -955,17 +955,31 @@ function engineHeaders(u) {
   return h;
 }
 function engineNorm(h) { return String(h || '').replace(/%252F/gi, '/').replace(/%2F/gi, '/').replace(/%3A/gi, ':').replace(/&amp;/g, '&').replace(/\\\//g, '/'); }
+// İstekler aynı anda en fazla 4 tane gider (öncekinde ~40 istek birden gidip hepsi zaman aşımına uğruyordu)
 function engineRun(queries, parse, sink, fetcher) {
-  var jobs = [];
+  var tasks = [];
   queries.forEach(function (q, qi) {
-    engineUrls(q, qi < 5, qi < 2).forEach(function (u, ui) {
-      jobs.push(fetcher(u, 'E' + (qi + 1) + '.' + ui).then(function (r) {
-        var items = r.ok ? parse(r.text) : [];
-        items.forEach(function (it) { sink.push(it); });
-      }, function () {}));
-    });
+    engineUrls(q, qi).forEach(function (u, ui) { tasks.push({ u: u, lbl: 'E' + (qi + 1) + '.' + ui }); });
   });
-  return Promise.all(jobs);
+  var idx = 0, active = 0, deadline = Date.now() + (AYAR.MOTOR_SURE || 11000);
+  return new Promise(function (resolve) {
+    var fin = false;
+    function pump() {
+      while (active < 4 && idx < tasks.length && Date.now() < deadline) {
+        (function (t) {
+          active++;
+          var p;
+          try { p = fetcher(t.u, t.lbl); } catch (e) { p = Promise.resolve({ ok: false, text: '' }); }
+          p.then(function (r) {
+            var items = (r && r.ok) ? parse(r.text) : [];
+            items.forEach(function (it) { sink.push(it); });
+          }, function () {}).then(function () { active--; pump(); });
+        })(tasks[idx++]);
+      }
+      if (!fin && active === 0 && (idx >= tasks.length || Date.now() >= deadline)) { fin = true; resolve(); }
+    }
+    pump();
+  });
 }
 
 function parseEngine(html) {
@@ -1084,7 +1098,12 @@ function makeStreams(item, ranked, meta) {
 
 function debugStream(msg) {
   if (!AYAR.DEBUG_MODU) return [];
-  return [msg].concat(dbg.slice(0, 70)).map(function (r) {
+  var isE = function (r) { return /^E\d+\.\d+ /.test(r); };
+  var eAll = dbg.filter(isE), rest = dbg.filter(function (r) { return !isE(r); }), cnt = {};
+  eAll.forEach(function (r) { var st = (r.split(' ')[1] || '?').split('/')[0]; cnt[st] = (cnt[st] || 0) + 1; });
+  var sum = 'motor istekleri: ' + (Object.keys(cnt).map(function (k) { return k + 'x' + cnt[k]; }).join(' ') || '-');
+  var good = eAll.filter(function (r) { return / 200\//.test(r); }).slice(0, 8);
+  return [msg, sum].concat(good, rest.slice(0, 80)).map(function (r) {
     return { name: 'DEBUG ' + r, title: 'DEBUG ' + r, url: 'https://debug.invalid/', quality: 'Auto', provider: PROVIDER_ID };
   });
 }
@@ -1188,7 +1207,7 @@ function buildQueries(imdb, year, titles, trTitles) {
 
 function getStreamsInner(tmdbId, mediaType, season, episode) {
   if (mediaType !== 'movie') return Promise.resolve([]);
-  dbg = ['v1.5.9'];
+  dbg = ['v1.5.10'];
   var T0 = Date.now();
   var base = 'https://api.themoviedb.org/3/movie/' + tmdbId + '?api_key=' + TMDB_KEY;
 
