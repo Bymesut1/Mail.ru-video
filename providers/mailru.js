@@ -9,7 +9,7 @@ var AYAR = {
   MOBILE: 'https://m.my.mail.ru',
   EKLENTI_ADI: 'mailru',   // manifest adıyla AYNI olmalı: akış kartında eklenti adı hep görünsün
   // true iken akış çıkmazsa neden çıkmadığını yazan "DEBUG" satırları görünür. Her şey çalışınca false yap.
-  DEBUG_MODU: true,
+  DEBUG_MODU: false,
   MIN_SURE: 300,   // sn: bundan kısa videolar (fragman/kesit) hariç; süre uyumu ARANMAZ. 0 yaparsan hiç eleme olmaz
   MAX_ADAY: 20,     // en fazla kaç aday video için kaynak çekilsin
   MAX_SORGU: 20,   // en fazla kaç arama yapılsın (öncelik sırasıyla; sondakiler süre yetmezse atlanır)
